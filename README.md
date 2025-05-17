@@ -66,5 +66,5 @@ If you’d like to help improve Vaultio, feel free to fork the repository, open 
 
 ## 👨‍💻 Author
 
-**Created by [Friizor](https://friizor.com)**
+**Created by [Friizor](https://friizor.com)**<br>
 *Built with love for simplicity, security, and privacy.*
