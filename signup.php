@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once 'db.php';
 
 // If user is already logged in, redirect to index.php
 if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
@@ -7,14 +8,49 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
     exit;
 }
 
+$errors = [];
+
 // Handle sign up form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Here you would add validation and save the user to your database
-    // For demo, just set session and redirect
-    $_SESSION['logged_in'] = true;
-    $_SESSION['user'] = 'New User'; // Replace with actual user data
-    header('Location: index.php');
-    exit;
+    $email = filter_var(trim($_POST['email']), FILTER_VALIDATE_EMAIL);
+    $password = $_POST['password'] ?? '';
+    $confirm_password = $_POST['confirm_password'] ?? '';
+    $name = isset($_POST['name']) ? trim($_POST['name']) : '';
+
+    // Validate input
+    if (!$email) {
+        $errors[] = 'Please enter a valid email address.';
+    }
+    if (strlen($password) < 8) {
+        $errors[] = 'Password must be at least 8 characters.';
+    }
+    if ($password !== $confirm_password) {
+        $errors[] = 'Passwords do not match.';
+    }
+    if (empty($name)) {
+        $errors[] = 'Please enter your name.';
+    }
+
+    // Check if email already exists
+    if (empty($errors)) {
+        $stmt = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
+        $stmt->execute([$email]);
+        if ($stmt->fetch()) {
+            $errors[] = 'This email is already registered.';
+        }
+    }
+
+    // If no errors, insert user
+    if (empty($errors)) {
+        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+        $stmt = $pdo->prepare('INSERT INTO users (email, password, name) VALUES (?, ?, ?)');
+        $stmt->execute([$email, $hashed_password, $name]);
+        $_SESSION['logged_in'] = true;
+        $_SESSION['user'] = $name;
+        $_SESSION['user_email'] = $email;
+        header('Location: index.php');
+        exit;
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -104,6 +140,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .btn-outline:hover {
             background-color: #333;
         }
+        .error-message {
+            background: #ef4444;
+            color: #fff;
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -115,12 +159,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="flex justify-center mb-6">
                 <h2 class="text-2xl font-semibold text-white">Create your account</h2>
             </div>
-            <form method="POST" action="signup.php">
+            <?php if (!empty($errors)): ?>
+                <div class="error-message">
+                    <?php foreach ($errors as $error): ?>
+                        <div><?= htmlspecialchars($error) ?></div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+            <form method="POST" action="signup.php" autocomplete="off">
+                <div class="input-group">
+                    <div class="w-5 h-5 flex items-center justify-center input-icon">
+                        <i class="ri-user-line"></i>
+                    </div>
+                    <input type="text" name="name" class="form-input" placeholder="Full name" required value="<?= isset($_POST['name']) ? htmlspecialchars($_POST['name']) : '' ?>">
+                </div>
                 <div class="input-group">
                     <div class="w-5 h-5 flex items-center justify-center input-icon">
                         <i class="ri-mail-line"></i>
                     </div>
-                    <input type="email" name="email" class="form-input" placeholder="Email address" required>
+                    <input type="email" name="email" class="form-input" placeholder="Email address" required value="<?= isset($_POST['email']) ? htmlspecialchars($_POST['email']) : '' ?>">
                 </div>
                 <div class="input-group">
                     <div class="w-5 h-5 flex items-center justify-center input-icon">
