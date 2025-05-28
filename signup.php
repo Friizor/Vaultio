@@ -21,8 +21,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$email) {
         $errors[] = 'Please enter a valid email address.';
     }
+    // Password requirements
+    $passwordErrors = [];
     if (strlen($password) < 8) {
-        $errors[] = 'Password must be at least 8 characters.';
+        $passwordErrors[] = 'at least 8 characters';
+    }
+    if (!preg_match('/[a-z]/', $password)) {
+        $passwordErrors[] = 'a lowercase letter';
+    }
+    if (!preg_match('/[A-Z]/', $password)) {
+        $passwordErrors[] = 'an uppercase letter';
+    }
+    if (!preg_match('/[0-9]/', $password)) {
+        $passwordErrors[] = 'a number';
+    }
+    if (!preg_match('/[^a-zA-Z0-9]/', $password)) {
+        $passwordErrors[] = 'a symbol';
+    }
+    if (!empty($passwordErrors)) {
+        $errors[] = 'The password must contain: <ul style="text-align:left; margin:0.5em 0 0 1.5em;">' .
+            implode('', array_map(fn($e) => "<li>".htmlspecialchars($e).".</li>", $passwordErrors)) . '</ul>';
     }
     if ($password !== $confirm_password) {
         $errors[] = 'Passwords do not match.';
@@ -162,7 +180,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php if (!empty($errors)): ?>
                 <div class="error-message">
                     <?php foreach ($errors as $error): ?>
-                        <div><?= htmlspecialchars($error) ?></div>
+                        <div><?= $error ?></div>
                     <?php endforeach; ?>
                 </div>
             <?php endif; ?>
