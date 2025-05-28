@@ -211,20 +211,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <div id="remember-checkbox" class="custom-checkbox" onclick="toggleCheckbox('remember-checkbox')"></div>
                         <label for="remember-checkbox" class="text-sm text-gray-400">Remember me</label>
                     </div>
-                    <a href="#" class="text-sm text-secondary hover:underline">Forgot password?</a>
+                    <a href="#" class="text-sm text-secondary hover:underline" onclick="showFeatureModal();return false;">Forgot password?</a>
                 </div>
                 <button type="submit" class="btn btn-primary w-full !rounded-button mb-4">Sign in</button>
+                <div class="text-center text-sm text-gray-400 mb-4">
+                    Don't have an account?
+                    <a href="signup.php" class="text-secondary hover:underline">Sign up</a>
+                </div>
                 <div class="divider">
                     <span>Or continue with</span>
                 </div>
                 <div class="social-login">
-                    <button type="button" class="social-btn !rounded-button">
+                    <button type="button" class="social-btn !rounded-button" onclick="showFeatureModal()">
                         <div class="w-5 h-5 flex items-center justify-center mr-2">
                             <i class="ri-google-fill"></i>
                         </div>
                         Google
                     </button>
-                    <button type="button" class="social-btn !rounded-button">
+                    <button type="button" class="social-btn !rounded-button" onclick="showFeatureModal()">
                         <div class="w-5 h-5 flex items-center justify-center mr-2">
                             <i class="ri-github-fill"></i>
                         </div>
@@ -232,6 +236,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Feature Coming Soon Modal -->
+    <div id="feature-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 hidden">
+        <div class="bg-[#242424] rounded-lg p-8 shadow-lg text-center max-w-xs w-full">
+            <h3 class="text-xl font-semibold text-white mb-4">Coming Soon</h3>
+            <p class="text-gray-300 mb-6">Sorry, this feature is not available yet.<br>Coming soon!</p>
+            <button onclick="closeFeatureModal()" class="btn btn-primary w-full">OK</button>
         </div>
     </div>
 
@@ -254,6 +267,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         function toggleCheckbox(id) {
             const checkbox = document.getElementById(id);
             checkbox.classList.toggle('checked');
+        }
+
+        // Feature Coming Soon Modal
+        function showFeatureModal() {
+            document.getElementById('feature-modal').classList.remove('hidden');
+        }
+        function closeFeatureModal() {
+            document.getElementById('feature-modal').classList.add('hidden');
         }
     </script>
 </body>

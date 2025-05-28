@@ -193,6 +193,7 @@ if (isset($_GET['logout'])) {
             background-color: #444;
             border-radius: 2px;
             outline: none;
+            appearance: none;
             -webkit-appearance: none;
         }
         .range-slider::-webkit-slider-thumb {
