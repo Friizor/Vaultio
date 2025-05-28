@@ -183,13 +183,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="w-5 h-5 flex items-center justify-center input-icon">
                         <i class="ri-lock-line"></i>
                     </div>
-                    <input type="password" name="password" class="form-input" placeholder="Password" required>
+                    <input type="password" id="password" name="password" class="form-input pr-10" placeholder="Password" required>
+                    <span class="w-5 h-5 flex items-center justify-center password-toggle absolute right-3 top-1/2 transform -translate-y-1/2 cursor-pointer" onclick="togglePassword('password', 'password-icon')">
+                        <i id="password-icon" class="ri-eye-off-line"></i>
+                    </span>
                 </div>
                 <div class="input-group">
                     <div class="w-5 h-5 flex items-center justify-center input-icon">
                         <i class="ri-lock-2-line"></i>
                     </div>
-                    <input type="password" name="confirm_password" class="form-input" placeholder="Confirm password" required>
+                    <input type="password" id="confirm_password" name="confirm_password" class="form-input pr-10" placeholder="Confirm password" required>
+                    <span class="w-5 h-5 flex items-center justify-center password-toggle absolute right-3 top-1/2 transform -translate-y-1/2 cursor-pointer" onclick="togglePassword('confirm_password', 'confirm-password-icon')">
+                        <i id="confirm-password-icon" class="ri-eye-off-line"></i>
+                    </span>
                 </div>
                 <button type="submit" class="btn btn-primary w-full !rounded-button mb-4">Sign up</button>
                 <div class="text-center text-sm text-gray-400 mb-4">
@@ -200,4 +206,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     </div>
 </body>
-</html> 
+</html>
+<script>
+function togglePassword(inputId, iconId) {
+    const input = document.getElementById(inputId);
+    const icon = document.getElementById(iconId);
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'ri-eye-line';
+    } else {
+        input.type = 'password';
+        icon.className = 'ri-eye-off-line';
+    }
+}
+</script> 
