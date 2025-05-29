@@ -64,12 +64,26 @@ if (isset($_GET['logout'])) {
     exit;
 }
 
+// Simple encryption function
+function encrypt($data, $key) {
+    $key = substr(hash('sha256', $key, true), 0, 32);
+    $iv = openssl_random_pseudo_bytes(16);
+    $encrypted = openssl_encrypt($data, 'AES-256-CBC', $key, 0, $iv);
+    return base64_encode($iv . $encrypted);
+}
+
+// Simple decryption function
+function decrypt($data, $key) {
+    $key = substr(hash('sha256', $key, true), 0, 32);
+    $data = base64_decode($data);
+    $iv = substr($data, 0, 16);
+    $encrypted = substr($data, 16);
+    return openssl_decrypt($encrypted, 'AES-256-CBC', $key, 0, $iv);
+}
+
 // Handle password submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_password') {
     try {
-        // Debug log
-        error_log("Form submitted: " . print_r($_POST, true));
-
         // Validate input
         if (empty($_POST['website']) || empty($_POST['username']) || empty($_POST['password'])) {
             throw new Exception('All fields are required');
@@ -95,67 +109,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         else if ($score <= 50) $strength = 'medium';
         else $strength = 'strong';
 
-        // Generate encryption key from user's master password or session
-        $encryption_key = hash('sha256', $_SESSION['user_id'] . 'your-secret-salt', true);
-        
-        // Generate a random IV for password
-        $iv_password = openssl_random_pseudo_bytes(openssl_cipher_iv_length('aes-256-cbc'));
-        
-        // Encrypt the password
-        $encrypted_password = openssl_encrypt(
-            $password,
-            'aes-256-cbc',
-            $encryption_key,
-            0,
-            $iv_password
-        );
-        
-        // Combine IV and encrypted password for storage
-        $stored_password = base64_encode($iv_password . $encrypted_password);
-
-        // Generate a random IV for username
-        $iv_username = openssl_random_pseudo_bytes(openssl_cipher_iv_length('aes-256-cbc'));
-        
-        // Encrypt the username
-        $encrypted_username = openssl_encrypt(
-            $_POST['username'],
-            'aes-256-cbc',
-            $encryption_key,
-            0,
-            $iv_username
-        );
-        
-        // Combine IV and encrypted username for storage
-        $stored_username = base64_encode($iv_username . $encrypted_username);
-
-        // Debug log
-        error_log("Attempting to insert password for user: " . $_SESSION['user_id']);
+        // Encrypt username and password
+        $key = $_SESSION['user_id'] . 'your-secret-salt';
+        $encrypted_username = encrypt($_POST['username'], $key);
+        $encrypted_password = encrypt($password, $key);
 
         // Insert into database
         $stmt = $pdo->prepare("INSERT INTO passwords (user_id, website, username, password, password_length, strength) VALUES (?, ?, ?, ?, ?, ?)");
         $result = $stmt->execute([
             $_SESSION['user_id'],
             $_POST['website'],
-            $stored_username,
-            $stored_password,
+            $encrypted_username,
+            $encrypted_password,
             strlen($password),
             $strength
         ]);
 
         if (!$result) {
-            error_log("Database error: " . print_r($stmt->errorInfo(), true));
             throw new Exception('Failed to save password');
         }
 
-        // Debug log
-        error_log("Password saved successfully");
-
-        // Redirect to prevent form resubmission
         header('Location: passwords.php?success=1');
         exit;
 
     } catch (Exception $e) {
-        error_log("Error saving password: " . $e->getMessage());
         $error = $e->getMessage();
     }
 }
@@ -167,7 +144,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             throw new Exception('Password ID is required');
         }
 
-        // Delete the password
         $stmt = $pdo->prepare("DELETE FROM passwords WHERE id = ? AND user_id = ?");
         $result = $stmt->execute([$_POST['password_id'], $_SESSION['user_id']]);
 
@@ -191,43 +167,20 @@ if (isset($_GET['success'])) {
     $notification_type = "error";
 }
 
-// Function to decrypt password
-function decryptPassword($encrypted_data) {
-    try {
-        // Get encryption key
-        $encryption_key = hash('sha256', $_SESSION['user_id'] . 'your-secret-salt', true);
-        
-        // Decode the stored data
-        $decoded = base64_decode($encrypted_data);
-        
-        // Extract IV and encrypted data
-        $iv_length = openssl_cipher_iv_length('aes-256-cbc');
-        $iv = substr($decoded, 0, $iv_length);
-        $encrypted = substr($decoded, $iv_length);
-        
-        // Decrypt
-        return openssl_decrypt(
-            $encrypted,
-            'aes-256-cbc',
-            $encryption_key,
-            0,
-            $iv
-        );
-    } catch (Exception $e) {
-        return false;
-    }
-}
-
 // Fetch user's passwords
 try {
     $stmt = $pdo->prepare("SELECT * FROM passwords WHERE user_id = ? ORDER BY last_updated DESC");
     $stmt->execute([$_SESSION['user_id']]);
-    $passwords = $stmt->fetchAll();
+    $passwords = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Decrypt usernames and passwords
+    // Decrypt usernames
+    $key = $_SESSION['user_id'] . 'your-secret-salt';
     foreach ($passwords as &$password) {
-        $password['username'] = decryptPassword($password['username']);
-        $password['password'] = decryptPassword($password['password']);
+        try {
+            $password['username'] = decrypt($password['username'], $key);
+        } catch (Exception $e) {
+            $password['username'] = "Error decrypting username";
+        }
     }
 } catch (PDOException $e) {
     $error = "Error fetching passwords: " . $e->getMessage();
@@ -424,6 +377,9 @@ try {
             background-color: rgba(0, 0, 0, 0.5);
             z-index: 999;
         }
+        .password-mask {
+            font-family: monospace;
+        }
     </style>
 </head>
 <body>
@@ -495,23 +451,6 @@ try {
                 </script>
                 <?php endif; ?>
 
-                <!-- Delete Confirmation Modal -->
-                <div id="delete-confirmation-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 hidden">
-                    <div class="bg-[#242424] rounded-lg p-8 shadow-lg text-center max-w-xs w-full">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-lg font-medium text-white">Delete Password</h3>
-                            <button type="button" class="text-gray-400 hover:text-white" onclick="closeDeleteModal()">
-                                <i class="ri-close-line text-xl"></i>
-                            </button>
-                        </div>
-                        <p class="text-gray-400 text-sm mb-4">Are you sure you want to delete this password? This action cannot be undone.</p>
-                        <div class="flex space-x-2">
-                            <button type="button" class="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white" onclick="closeDeleteModal()">Cancel</button>
-                            <button type="button" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white" onclick="confirmDelete()">Delete</button>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Search and Filter -->
                 <div class="mb-6">
                     <div class="flex flex-col md:flex-row gap-4">
@@ -532,7 +471,7 @@ try {
                     </div>
                 </div>
 
-                <!-- Passwords List -->
+                <!-- Password List Table (Regenerated) -->
                 <div class="bg-[#242424] rounded-lg overflow-hidden shadow-md mb-6">
                     <div class="overflow-x-auto">
                         <table class="w-full">
@@ -547,79 +486,120 @@ try {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php if (empty($passwords)): ?>
-                                <tr>
-                                    <td colspan="6" class="py-4 text-center text-gray-400">No passwords saved yet</td>
-                                </tr>
-                                <?php else: ?>
-                                <?php foreach ($passwords as $password): ?>
-                                <tr class="border-b border-gray-700 hover:bg-gray-700">
-                                    <td class="py-2 px-4 border-b border-gray-700">
-                                        <div class="flex items-center">
-                                            <?php
-                                            // Generate a consistent color based on the website name
-                                            $colors = [
-                                                'bg-blue-600', 'bg-red-600', 'bg-green-600', 
-                                                'bg-yellow-600', 'bg-purple-600', 'bg-pink-600',
-                                                'bg-indigo-600', 'bg-teal-600', 'bg-orange-600'
-                                            ];
-                                            // Use the first character of the website name to determine the color
-                                            $firstChar = ord(strtolower(substr($password['website'], 0, 1)));
-                                            $colorIndex = $firstChar % count($colors);
-                                            $colorClass = $colors[$colorIndex];
-                                            ?>
-                                            <div class="w-8 h-8 flex items-center justify-center rounded-full <?php echo $colorClass; ?> mr-3 text-white text-xs">
-                                                <?php echo htmlspecialchars(strtoupper(substr($password['website'], 0, 1))); ?>
-                                            </div>
-                                            <span class="font-medium text-white"><?php echo htmlspecialchars($password['website']); ?></span>
-                                        </div>
-                                    </td>
-                                    <td class="py-2 px-4 border-b border-gray-700 text-sm"><?php echo htmlspecialchars($password['username']); ?></td>
-                                    <td class="py-2 px-4 border-b border-gray-700">
-                                        <div class="flex items-center">
-                                            <span class="text-gray-300 password-mask">••••••••</span>
-                                            <button type="button" class="ml-2 text-gray-400 hover:text-white toggle-password" 
-                                                    data-password="<?php echo htmlspecialchars($password['password']); ?>">
-                                                <div class="w-5 h-5 flex items-center justify-center">
-                                                    <i class="ri-eye-line"></i>
+                                <?php
+                                // Fetch user's passwords (New Fetch)
+                                try {
+                                    $stmt_new = $pdo->prepare("SELECT * FROM passwords WHERE user_id = ? ORDER BY last_updated DESC");
+                                    $stmt_new->execute([$_SESSION['user_id']]);
+                                    $passwords_new = $stmt_new->fetchAll(PDO::FETCH_ASSOC);
+
+                                    if (empty($passwords_new)): ?>
+                                    <tr>
+                                        <td colspan="6" class="py-4 text-center text-gray-400">No passwords saved yet</td>
+                                    </tr>
+                                    <?php else: ?>
+                                    <?php foreach ($passwords_new as $password): ?>
+                                    <tr class="border-b border-gray-700 hover:bg-gray-700">
+                                        <td class="py-2 px-4 border-b border-gray-700">
+                                            <div class="flex items-center">
+                                                <?php
+                                                // Get the website name for the current password entry and escape it for display
+                                                $websiteName = htmlspecialchars($password['website']);
+                                                $firstLetter = strtoupper(substr($websiteName, 0, 1));
+                                                $colors = [
+                                                    'bg-blue-600', 'bg-red-600', 'bg-green-600',
+                                                    'bg-yellow-600', 'bg-purple-600', 'bg-pink-600',
+                                                    'bg-indigo-600', 'bg-teal-600', 'bg-orange-600'
+                                                ];
+                                                // Use the first character to determine the color index
+                                                $colorIndex = ord(strtolower($firstLetter)) % count($colors);
+                                                $colorClass = $colors[$colorIndex];
+                                                ?>
+                                                <div class="w-8 h-8 flex items-center justify-center rounded-full <?php echo $colorClass; ?> mr-3 text-white text-xs">
+                                                    <?php echo $firstLetter; // Display the first letter ?>
                                                 </div>
-                                            </button>
-                                        </div>
-                                    </td>
-                                    <td class="py-2 px-4 border-b border-gray-700">
-                                        <div class="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
-                                            <div class="h-full <?php 
-                                                echo $password['strength'] === 'weak' ? 'bg-red-500' : 
-                                                    ($password['strength'] === 'medium' ? 'bg-orange-500' : 'bg-green-500'); 
-                                            ?>" style="width: <?php 
-                                                echo $password['strength'] === 'weak' ? '40%' : 
-                                                    ($password['strength'] === 'medium' ? '60%' : '80%'); 
-                                            ?>"></div>
-                                        </div>
-                                    </td>
-                                    <td class="py-2 px-4 border-b border-gray-700 text-sm text-gray-400">
-                                        <?php echo date('M d, Y', strtotime($password['last_updated'])); ?>
-                                    </td>
-                                    <td class="py-2 px-4 border-b border-gray-700">
-                                        <div class="flex space-x-2">
-                                            <button type="button" class="text-gray-400 hover:text-white copy-password" 
-                                                    data-password="<?php echo htmlspecialchars($password['password']); ?>" 
-                                                    title="Copy password">
-                                                <i class="ri-clipboard-line"></i>
-                                            </button>
-                                            <button type="button" class="text-gray-400 hover:text-white" title="Edit">
-                                                <i class="ri-edit-line"></i>
-                                            </button>
-                                            <button type="button" class="text-gray-400 hover:text-white" title="Delete" onclick="showDeleteModal(<?php echo $password['id']; ?>)">
-                                                <i class="ri-delete-bin-line"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
+                                                <span class="font-medium text-white"><?php echo $websiteName; // Display the escaped website name ?></span>
+                                            </div>
+                                        </td>
+                                        <td class="py-2 px-4 border-b border-gray-700 text-sm">
+                                            <?php
+                                            // Decrypt username for display
+                                            $decrypted_username = "Error decrypting username";
+                                            try {
+                                                $decrypted_username = decrypt($password['username'], $key);
+                                            } catch (Exception $e) {
+                                                // Handle decryption error if necessary
+                                            }
+                                            echo htmlspecialchars($decrypted_username);
+                                            ?>
+                                        </td>
+                                        <td class="py-2 px-4 border-b border-gray-700">
+                                            <div class="flex items-center">
+                                                <span class="text-gray-300 password-mask" data-password="<?php echo htmlspecialchars($password['password']); ?>">••••••••</span>
+                                                <button type="button" class="ml-2 text-gray-400 hover:text-white toggle-password"
+                                                        data-password="<?php echo htmlspecialchars($password['password']); ?>">
+                                                    <div class="w-5 h-5 flex items-center justify-center">
+                                                        <i class="ri-eye-line"></i>
+                                                    </div>
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <td class="py-2 px-4 border-b border-gray-700">
+                                            <div class="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
+                                                <div class="h-full <?php
+                                                    echo $password['strength'] === 'weak' ? 'bg-red-500' :
+                                                        ($password['strength'] === 'medium' ? 'bg-orange-500' : 'bg-green-500');
+                                                ?>" style="width: <?php
+                                                    echo $password['strength'] === 'weak' ? '40%' :
+                                                        ($password['strength'] === 'medium' ? '60%' : '80%');
+                                                ?>"></div>
+                                            </div>
+                                        </td>
+                                        <td class="py-2 px-4 border-b border-gray-700 text-sm text-gray-400">
+                                            <?php echo date('M d, Y', strtotime($password['last_updated'])); ?>
+                                        </td>
+                                        <td class="py-2 px-4 border-b border-gray-700">
+                                            <div class="flex space-x-2">
+                                                <button type="button" class="text-gray-400 hover:text-white copy-password"
+                                                        data-password="<?php echo htmlspecialchars($password['password']); ?>"
+                                                        title="Copy password">
+                                                    <i class="ri-clipboard-line"></i>
+                                                </button>
+                                                <button type="button" class="text-gray-400 hover:text-white" title="Edit">
+                                                    <i class="ri-edit-line"></i>
+                                                </button>
+                                                <button type="button" class="text-gray-400 hover:text-white" title="Delete" onclick="showDeleteModal(<?php echo $password['id']; ?>)">
+                                                    <i class="ri-delete-bin-line"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
                                 <?php endif; ?>
+                                <?php
+                                } catch (PDOException $e) {
+                                    echo "<tr><td colspan=\"6\" class=\"py-4 text-center text-red-500\">Error fetching passwords: " . htmlspecialchars($e->getMessage()) . "</td></tr>";
+                                }
+                                ?>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                <!-- Delete Confirmation Modal -->
+                <div id="delete-confirmation-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 hidden">
+                    <div class="bg-[#242424] rounded-lg p-8 shadow-lg text-center max-w-xs w-full">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-medium text-white">Delete Password</h3>
+                            <button type="button" class="text-gray-400 hover:text-white" onclick="closeDeleteModal()">
+                                <i class="ri-close-line text-xl"></i>
+                            </button>
+                        </div>
+                        <p class="text-gray-400 text-sm mb-4">Are you sure you want to delete this password? This action cannot be undone.</p>
+                        <div class="flex space-x-2">
+                            <button type="button" class="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white" onclick="closeDeleteModal()">Cancel</button>
+                            <button type="button" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white" onclick="confirmDelete()">Delete</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -907,27 +887,42 @@ try {
 
         // Add password visibility toggle functionality
         document.querySelectorAll('.toggle-password').forEach(button => {
-            button.addEventListener('click', function() {
+            button.addEventListener('click', async function() {
                 const passwordMask = this.parentElement.querySelector('.password-mask');
                 const icon = this.querySelector('i');
                 const encryptedPassword = this.dataset.password;
                 
                 if (passwordMask.textContent === '••••••••') {
-                    // Decrypt and show password
-                    fetch('decrypt_password.php', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ password: encryptedPassword })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
+                    try {
+                        // Show loading state
+                        icon.className = 'ri-loader-4-line animate-spin';
+                        
+                        // Decrypt password
+                        const response = await fetch('decrypt_password.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ password: encryptedPassword })
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+
+                        const data = await response.json();
+                        
                         if (data.success) {
                             passwordMask.textContent = data.password;
                             icon.className = 'ri-eye-off-line';
+                        } else {
+                            throw new Error(data.message || 'Failed to decrypt password');
                         }
-                    });
+                    } catch (error) {
+                        console.error('Error:', error);
+                        icon.className = 'ri-eye-line';
+                        alert('Error decrypting password: ' + error.message);
+                    }
                 } else {
                     // Hide password
                     passwordMask.textContent = '••••••••';
@@ -958,6 +953,19 @@ try {
                             setTimeout(() => {
                                 this.setAttribute('title', originalTitle);
                             }, 2000);
+
+                            // Change icon to indicate success
+                            const icon = this.querySelector('i');
+                            const originalIconClass = icon.className;
+                            icon.className = 'ri-check-line text-green-500'; // Change to a success icon and color
+
+                            // Revert icon after a delay
+                            setTimeout(() => {
+                                icon.className = originalIconClass;
+                            }, 2000); // Match this duration with the title change delay
+                        }).catch(err => {
+                            console.error('Failed to copy password: ', err);
+                            // Optionally show an error feedback
                         });
                     }
                 });
@@ -996,6 +1004,21 @@ try {
                 closeDeleteModal();
             }
         });
+
+        // Add notification function
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.className = `fixed bottom-4 right-4 px-4 py-2 rounded-lg shadow-lg z-50 ${
+                type === 'success' ? 'bg-green-500' : 'bg-red-500'
+            } text-white`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            // Remove notification after 3 seconds
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
     </script>
 </body>
 </html> 
