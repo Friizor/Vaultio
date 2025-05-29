@@ -617,17 +617,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     <div class="flex flex-col md:flex-row gap-4">
                         <div class="flex-1">
                             <div class="relative">
-                                <input type="text" placeholder="Search passwords..." class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-secondary">
+                                <input type="text" id="search-input" placeholder="Search passwords..." class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-secondary">
                                 <i class="ri-search-line absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                             </div>
                         </div>
                         <div class="flex gap-2">
-                            <button class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white flex items-center">
-                                <i class="ri-filter-3-line mr-2"></i> Filter
-                            </button>
-                            <button class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white flex items-center">
-                                <i class="ri-sort-asc mr-2"></i> Sort
-                            </button>
+                            <div class="relative">
+                                <button id="filter-button" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white flex items-center">
+                                    <i class="ri-filter-3-line mr-2"></i> Filter
+                                </button>
+                                <div id="filter-dropdown" class="absolute left-0 mt-2 w-48 bg-[#242424] rounded-lg shadow-lg border border-gray-700 hidden z-50">
+                                    <div class="p-2">
+                                        <h3 class="text-sm font-medium text-gray-300 mb-2">Filter by Category</h3>
+                                        <div class="space-y-1">
+                                            <button class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md filter-category" data-category="all">
+                                                All Categories
+                                            </button>
+                                            <button class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md filter-category" data-category="Websites">
+                                                Websites
+                                            </button>
+                                            <button class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md filter-category" data-category="Financial">
+                                                Financial
+                                            </button>
+                                            <button class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md filter-category" data-category="Applications">
+                                                Applications
+                                            </button>
+                                            <button class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md filter-category" data-category="Wi-Fi">
+                                                Wi-Fi
+                                            </button>
+                                            <button class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md filter-category" data-category="Social Media">
+                                                Social Media
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="relative">
+                                <button id="sort-button" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white flex items-center">
+                                    <i class="ri-sort-asc mr-2"></i> Sort
+                                </button>
+                                <div id="sort-dropdown" class="absolute right-0 mt-2 w-48 bg-[#242424] rounded-lg shadow-lg border border-gray-700 hidden z-50">
+                                    <div class="p-2">
+                                        <h3 class="text-sm font-medium text-gray-300 mb-2">Sort by</h3>
+                                        <div class="space-y-1">
+                                            <button class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md sort-option" data-sort="website" data-order="asc">
+                                                <i class="ri-sort-asc mr-2"></i> Website (A-Z)
+                                            </button>
+                                            <button class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md sort-option" data-sort="website" data-order="desc">
+                                                <i class="ri-sort-desc mr-2"></i> Website (Z-A)
+                                            </button>
+                                            <button class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md sort-option" data-sort="date" data-order="desc">
+                                                <i class="ri-sort-desc mr-2"></i> Recently Updated
+                                            </button>
+                                            <button class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md sort-option" data-sort="date" data-order="asc">
+                                                <i class="ri-sort-asc mr-2"></i> Oldest First
+                                            </button>
+                                            <button class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md sort-option" data-sort="strength" data-order="desc">
+                                                <i class="ri-sort-desc mr-2"></i> Strongest First
+                                            </button>
+                                            <button class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md sort-option" data-sort="strength" data-order="asc">
+                                                <i class="ri-sort-asc mr-2"></i> Weakest First
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -642,7 +696,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                     <th class="py-2 px-4 border-b border-gray-700">Username/Email</th>
                                     <th class="py-2 px-4 border-b border-gray-700">Password</th>
                                     <th class="py-2 px-4 border-b border-gray-700">Password Length</th>
-                                    <th class="py-2 px-4 border-b border-gray-700">Category</th>
                                     <th class="py-2 px-4 border-b border-gray-700">Last Updated</th>
                                     <th class="py-2 px-4 border-b border-gray-700">Actions</th>
                                 </tr>
@@ -657,11 +710,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
                                     if (empty($passwords_new)): ?>
                                     <tr>
-                                        <td colspan="7" class="py-4 text-center text-gray-400">No passwords saved yet</td>
+                                        <td colspan="6" class="py-4 text-center text-gray-400">No passwords saved yet</td>
                                     </tr>
                                     <?php else: ?>
                                     <?php foreach ($passwords_new as $password): ?>
-                                    <tr class="border-b border-gray-700 hover:bg-gray-700">
+                                    <tr class="border-b border-gray-700 hover:bg-gray-700" data-category="<?php echo htmlspecialchars($password['category']); ?>">
                                         <td class="py-2 px-4 border-b border-gray-700">
                                             <div class="flex items-center">
                                                 <?php
@@ -717,7 +770,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                                 ?>"></div>
                                             </div>
                                         </td>
-                                        <td class="py-2 px-4 border-b border-gray-700 text-sm"><?php echo htmlspecialchars($password['category']); ?></td>
                                         <td class="py-2 px-4 border-b border-gray-700 text-sm text-gray-400">
                                             <?php echo date('M d, Y', strtotime($password['last_updated'])); ?>
                                         </td>
@@ -741,12 +793,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 <?php endif; ?>
                                 <?php
                                 } catch (PDOException $e) {
-                                    echo "<tr><td colspan=\"7\" class=\"py-4 text-center text-red-500\">Error fetching passwords: " . htmlspecialchars($e->getMessage()) . "</td></tr>";
+                                    echo "<tr><td colspan=\"6\" class=\"py-4 text-center text-red-500\">Error fetching passwords: " . htmlspecialchars($e->getMessage()) . "</td></tr>";
                                 }
                                 ?>
                             </tbody>
                         </table>
                     </div>
+                </div>
+
+                <!-- Add Export PDF Button -->
+                <div class="flex justify-end mb-4">
+                    <button id="export-pdf" class="px-4 py-2 bg-secondary hover:bg-teal-600 rounded-lg text-white flex items-center">
+                        <i class="ri-file-pdf-line mr-2"></i> Export to PDF
+                    </button>
                 </div>
 
                 <!-- Delete Confirmation Modal -->
@@ -931,6 +990,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             </div>
         </div>
     </div>
+
+    <!-- Add jsPDF library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 
     <script>
         let activityTimeout;
@@ -1134,7 +1197,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             document.getElementById('edit-website').value = website;
             document.getElementById('edit-username').value = username.trim(); // Trim whitespace
             document.getElementById('edit-password').value = password;
-            document.getElementById('edit-category').value = category;
+            
+            // Set the category value
+            const categorySelect = document.getElementById('edit-category');
+            categorySelect.value = category;
             
             // Check password strength
             checkPasswordStrength('edit-password', 'edit-password-strength-bar', 'edit-password-strength-text');
@@ -1241,7 +1307,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 const username = row.querySelector('td:nth-child(2)').textContent;
                 const passwordMask = row.querySelector('.password-mask');
                 const encryptedPassword = passwordMask ? passwordMask.dataset.password : '';
-                const category = row.querySelector('td:nth-child(5)').textContent;
+                const category = row.getAttribute('data-category'); // Get category from data attribute
 
                 if (!encryptedPassword) {
                     console.error('Could not find password data.');
@@ -1452,6 +1518,348 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 closeDeleteModal();
             }
         });
+
+        // Add filter functionality
+        document.getElementById('filter-button').addEventListener('click', function(e) {
+            e.stopPropagation();
+            const dropdown = document.getElementById('filter-dropdown');
+            dropdown.classList.toggle('hidden');
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            const dropdown = document.getElementById('filter-dropdown');
+            const filterButton = document.getElementById('filter-button');
+            if (!dropdown.contains(e.target) && !filterButton.contains(e.target)) {
+                dropdown.classList.add('hidden');
+            }
+        });
+
+        // Handle category filtering
+        document.querySelectorAll('.filter-category').forEach(button => {
+            button.addEventListener('click', function() {
+                const selectedCategory = this.dataset.category;
+                const rows = document.querySelectorAll('tbody tr');
+                let visibleRows = 0;
+                
+                // Update active state of filter buttons
+                document.querySelectorAll('.filter-category').forEach(btn => {
+                    btn.classList.remove('bg-gray-700');
+                });
+                this.classList.add('bg-gray-700');
+                
+                // Filter rows
+                rows.forEach(row => {
+                    if (selectedCategory === 'all' || row.dataset.category === selectedCategory) {
+                        row.style.display = '';
+                        visibleRows++;
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+
+                // Show message if no passwords in category
+                const noPasswordsRow = document.querySelector('tbody tr.no-passwords-message');
+                if (noPasswordsRow) {
+                    noPasswordsRow.remove();
+                }
+
+                if (visibleRows === 0 && selectedCategory !== 'all') {
+                    const tbody = document.querySelector('tbody');
+                    const messageRow = document.createElement('tr');
+                    messageRow.className = 'no-passwords-message';
+                    messageRow.innerHTML = `
+                        <td colspan="6" class="py-4 text-center text-gray-400">
+                            No passwords saved in ${selectedCategory} category yet
+                        </td>
+                    `;
+                    tbody.appendChild(messageRow);
+                }
+                
+                // Close dropdown
+                document.getElementById('filter-dropdown').classList.add('hidden');
+            });
+        });
+
+        // Add sort functionality
+        document.getElementById('sort-button').addEventListener('click', function(e) {
+            e.stopPropagation();
+            const dropdown = document.getElementById('sort-dropdown');
+            dropdown.classList.toggle('hidden');
+        });
+
+        // Close sort dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            const dropdown = document.getElementById('sort-dropdown');
+            const sortButton = document.getElementById('sort-button');
+            if (!dropdown.contains(e.target) && !sortButton.contains(e.target)) {
+                dropdown.classList.add('hidden');
+            }
+        });
+
+        // Handle sorting
+        document.querySelectorAll('.sort-option').forEach(button => {
+            button.addEventListener('click', function() {
+                const sortBy = this.dataset.sort;
+                const order = this.dataset.order;
+                const tbody = document.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr:not(.no-passwords-message)'));
+
+                // Update active state of sort buttons
+                document.querySelectorAll('.sort-option').forEach(btn => {
+                    btn.classList.remove('bg-gray-700');
+                });
+                this.classList.add('bg-gray-700');
+
+                // Sort rows
+                rows.sort((a, b) => {
+                    let aValue, bValue;
+
+                    switch(sortBy) {
+                        case 'website':
+                            aValue = a.querySelector('td:first-child span').textContent.toLowerCase();
+                            bValue = b.querySelector('td:first-child span').textContent.toLowerCase();
+                            break;
+                        case 'date':
+                            aValue = new Date(a.querySelector('td:nth-child(5)').textContent);
+                            bValue = new Date(b.querySelector('td:nth-child(5)').textContent);
+                            break;
+                        case 'strength':
+                            const strengthOrder = { 'strong': 3, 'medium': 2, 'weak': 1 };
+                            aValue = strengthOrder[a.querySelector('.h-full').classList.contains('bg-green-500') ? 'strong' : 
+                                    a.querySelector('.h-full').classList.contains('bg-orange-500') ? 'medium' : 'weak'];
+                            bValue = strengthOrder[b.querySelector('.h-full').classList.contains('bg-green-500') ? 'strong' : 
+                                    b.querySelector('.h-full').classList.contains('bg-orange-500') ? 'medium' : 'weak'];
+                            break;
+                    }
+
+                    if (order === 'asc') {
+                        return aValue > bValue ? 1 : -1;
+                    } else {
+                        return aValue < bValue ? 1 : -1;
+                    }
+                });
+
+                // Reorder rows in the table
+                rows.forEach(row => tbody.appendChild(row));
+
+                // Close dropdown
+                document.getElementById('sort-dropdown').classList.add('hidden');
+            });
+        });
+
+        // Add search functionality
+        document.getElementById('search-input').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const rows = document.querySelectorAll('tbody tr:not(.no-passwords-message)');
+            let visibleRows = 0;
+
+            rows.forEach(row => {
+                const website = row.querySelector('td:first-child span').textContent.toLowerCase();
+                const username = row.querySelector('td:nth-child(2)').textContent.toLowerCase();
+                
+                if (website.includes(searchTerm) || username.includes(searchTerm)) {
+                    row.style.display = '';
+                    visibleRows++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            // Show message if no results found
+            const noPasswordsRow = document.querySelector('tbody tr.no-passwords-message');
+            if (noPasswordsRow) {
+                noPasswordsRow.remove();
+            }
+
+            if (visibleRows === 0 && searchTerm !== '') {
+                const tbody = document.querySelector('tbody');
+                const messageRow = document.createElement('tr');
+                messageRow.className = 'no-passwords-message';
+                messageRow.innerHTML = `
+                    <td colspan="6" class="py-4 text-center text-gray-400">
+                        No passwords found matching "${searchTerm}"
+                    </td>
+                `;
+                tbody.appendChild(messageRow);
+            }
+        });
+
+        // Reset timeout on search input
+        document.getElementById('search-input').addEventListener('input', resetActivityTimeout);
+
+        // Add PDF Export functionality
+        document.getElementById('export-pdf').addEventListener('click', async function() {
+            // Show loading state
+            const button = this;
+            const originalContent = button.innerHTML;
+            button.innerHTML = '<i class="ri-loader-4-line animate-spin mr-2"></i> Generating PDF...';
+            button.disabled = true;
+
+            try {
+                // Get all visible rows (excluding the "no passwords" message)
+                const rows = Array.from(document.querySelectorAll('tbody tr:not(.no-passwords-message)')).filter(row => row.style.display !== 'none');
+                
+                if (rows.length === 0) {
+                    showNotification('No passwords to export', 'error');
+                    return;
+                }
+
+                // Prepare table data with decrypted passwords
+                const tableData = [];
+                for (const row of rows) {
+                    const website = row.querySelector('td:first-child span').textContent;
+                    const username = row.querySelector('td:nth-child(2)').textContent;
+                    const encryptedPassword = row.querySelector('.password-mask').dataset.password;
+
+                    // Decrypt password
+                    try {
+                        const response = await fetch('decrypt_password.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ password: encryptedPassword })
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to decrypt password');
+                        }
+
+                        const data = await response.json();
+                        if (!data.success) {
+                            throw new Error(data.message || 'Failed to decrypt password');
+                        }
+
+                        tableData.push({
+                            website,
+                            username,
+                            password: data.password
+                        });
+                    } catch (error) {
+                        console.error('Error decrypting password:', error);
+                        showNotification('Error decrypting some passwords', 'error');
+                        continue;
+                    }
+                }
+
+                // Sort data alphabetically by website name
+                tableData.sort((a, b) => a.website.localeCompare(b.website));
+
+                // Create new PDF document
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+
+                // Add title with cool styling
+                doc.setFontSize(24);
+                doc.setTextColor(30, 58, 138); // Primary color
+                doc.text('Vaultio', 105, 20, { align: 'center' });
+                
+                doc.setFontSize(16);
+                doc.setTextColor(13, 148, 136); // Secondary color
+                doc.text('Password List', 105, 30, { align: 'center' });
+
+                // Add decorative line
+                doc.setDrawColor(30, 58, 138);
+                doc.setLineWidth(0.5);
+                doc.line(20, 35, 190, 35);
+
+                // Add date with styling
+                doc.setFontSize(10);
+                doc.setTextColor(100, 100, 100);
+                doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 105, 45, { align: 'center' });
+
+                // Add table with enhanced styling
+                doc.autoTable({
+                    head: [['Website', 'Username', 'Password']],
+                    body: tableData.map(item => [item.website, item.username, item.password]),
+                    startY: 50,
+                    theme: 'grid',
+                    styles: {
+                        fontSize: 10,
+                        cellPadding: 5,
+                        textColor: [50, 50, 50],
+                        fontStyle: 'normal',
+                        halign: 'center', // Center all content by default
+                        valign: 'middle', // Vertical center
+                    },
+                    headStyles: {
+                        fillColor: [30, 58, 138], // Primary color
+                        textColor: 255,
+                        fontStyle: 'bold',
+                        halign: 'center',
+                        valign: 'middle',
+                    },
+                    alternateRowStyles: {
+                        fillColor: [245, 245, 245],
+                    },
+                    columnStyles: {
+                        0: { 
+                            cellWidth: 50,
+                            fontStyle: 'bold',
+                            textColor: [30, 58, 138], // Primary color for website names
+                            halign: 'center', // Ensure website column is centered
+                        },
+                        1: { 
+                            cellWidth: 60,
+                            textColor: [13, 148, 136], // Secondary color for usernames
+                            halign: 'center', // Ensure username column is centered
+                        },
+                        2: { 
+                            cellWidth: 50,
+                            fontStyle: 'bold',
+                            textColor: [50, 50, 50], // Dark gray for passwords
+                            halign: 'center', // Ensure password column is centered
+                        },
+                    },
+                    margin: { top: 10, left: 25, right: 25 }, // Center the table horizontally
+                    tableWidth: 'auto',
+                    showFoot: 'lastPage',
+                    footStyles: {
+                        fillColor: [30, 58, 138],
+                        textColor: 255,
+                        fontStyle: 'bold',
+                        halign: 'center',
+                    },
+                    foot: [['', '', '']], // Empty footer row for spacing
+                });
+
+                // Add footer with page numbers and decorative elements
+                const pageCount = doc.internal.getNumberOfPages();
+                for (let i = 1; i <= pageCount; i++) {
+                    doc.setPage(i);
+                    
+                    // Add decorative line at bottom
+                    doc.setDrawColor(30, 58, 138);
+                    doc.setLineWidth(0.5);
+                    doc.line(20, doc.internal.pageSize.height - 20, 190, doc.internal.pageSize.height - 20);
+                    
+                    // Add page number with styling
+                    doc.setFontSize(10);
+                    doc.setTextColor(100, 100, 100);
+                    doc.text(
+                        `Page ${i} of ${pageCount}`,
+                        doc.internal.pageSize.width / 2,
+                        doc.internal.pageSize.height - 10,
+                        { align: 'center' }
+                    );
+                }
+
+                // Save the PDF
+                doc.save('vaultio-passwords.pdf');
+                showNotification('PDF exported successfully!', 'success');
+            } catch (error) {
+                console.error('Error generating PDF:', error);
+                showNotification('Error generating PDF', 'error');
+            } finally {
+                // Reset button state
+                button.innerHTML = originalContent;
+                button.disabled = false;
+            }
+        });
+
+        // Reset timeout on PDF export button
+        document.getElementById('export-pdf').addEventListener('click', resetActivityTimeout);
     </script>
 </body>
 </html> 
