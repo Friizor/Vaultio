@@ -2,6 +2,11 @@
 session_start();
 require_once 'db.php';
 
+// Debug information
+error_log("Session data: " . print_r($_SESSION, true));
+error_log("POST data: " . print_r($_POST, true));
+error_log("Request method: " . $_SERVER['REQUEST_METHOD']);
+
 // Authentication check
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     header('Location: login.php');
@@ -57,6 +62,176 @@ if (isset($_GET['logout'])) {
     session_destroy();
     header('Location: login.php');
     exit;
+}
+
+// Handle password submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_password') {
+    try {
+        // Debug log
+        error_log("Form submitted: " . print_r($_POST, true));
+
+        // Validate input
+        if (empty($_POST['website']) || empty($_POST['username']) || empty($_POST['password'])) {
+            throw new Exception('All fields are required');
+        }
+
+        // Get password strength
+        $password = $_POST['password'];
+        $strength = 'weak';
+        $score = 0;
+
+        // Length check
+        if (strlen($password) >= 8) $score += 25;
+        // Lowercase check
+        if (preg_match('/[a-z]/', $password)) $score += 25;
+        // Uppercase check
+        if (preg_match('/[A-Z]/', $password)) $score += 25;
+        // Number check
+        if (preg_match('/[0-9]/', $password)) $score += 12.5;
+        // Special character check
+        if (preg_match('/[^A-Za-z0-9]/', $password)) $score += 12.5;
+
+        if ($score <= 25) $strength = 'weak';
+        else if ($score <= 50) $strength = 'medium';
+        else $strength = 'strong';
+
+        // Generate encryption key from user's master password or session
+        $encryption_key = hash('sha256', $_SESSION['user_id'] . 'your-secret-salt', true);
+        
+        // Generate a random IV for password
+        $iv_password = openssl_random_pseudo_bytes(openssl_cipher_iv_length('aes-256-cbc'));
+        
+        // Encrypt the password
+        $encrypted_password = openssl_encrypt(
+            $password,
+            'aes-256-cbc',
+            $encryption_key,
+            0,
+            $iv_password
+        );
+        
+        // Combine IV and encrypted password for storage
+        $stored_password = base64_encode($iv_password . $encrypted_password);
+
+        // Generate a random IV for username
+        $iv_username = openssl_random_pseudo_bytes(openssl_cipher_iv_length('aes-256-cbc'));
+        
+        // Encrypt the username
+        $encrypted_username = openssl_encrypt(
+            $_POST['username'],
+            'aes-256-cbc',
+            $encryption_key,
+            0,
+            $iv_username
+        );
+        
+        // Combine IV and encrypted username for storage
+        $stored_username = base64_encode($iv_username . $encrypted_username);
+
+        // Debug log
+        error_log("Attempting to insert password for user: " . $_SESSION['user_id']);
+
+        // Insert into database
+        $stmt = $pdo->prepare("INSERT INTO passwords (user_id, website, username, password, password_length, strength) VALUES (?, ?, ?, ?, ?, ?)");
+        $result = $stmt->execute([
+            $_SESSION['user_id'],
+            $_POST['website'],
+            $stored_username,
+            $stored_password,
+            strlen($password),
+            $strength
+        ]);
+
+        if (!$result) {
+            error_log("Database error: " . print_r($stmt->errorInfo(), true));
+            throw new Exception('Failed to save password');
+        }
+
+        // Debug log
+        error_log("Password saved successfully");
+
+        // Redirect to prevent form resubmission
+        header('Location: passwords.php?success=1');
+        exit;
+
+    } catch (Exception $e) {
+        error_log("Error saving password: " . $e->getMessage());
+        $error = $e->getMessage();
+    }
+}
+
+// Handle password deletion
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_password') {
+    try {
+        if (empty($_POST['password_id'])) {
+            throw new Exception('Password ID is required');
+        }
+
+        // Delete the password
+        $stmt = $pdo->prepare("DELETE FROM passwords WHERE id = ? AND user_id = ?");
+        $result = $stmt->execute([$_POST['password_id'], $_SESSION['user_id']]);
+
+        if (!$result) {
+            throw new Exception('Failed to delete password');
+        }
+
+        header('Location: passwords.php?deleted=1');
+        exit;
+
+    } catch (Exception $e) {
+        $error = $e->getMessage();
+    }
+}
+
+// Add success/error message display
+if (isset($_GET['success'])) {
+    $success = "Password saved successfully!";
+} elseif (isset($_GET['deleted'])) {
+    $success = "Password deleted successfully!";
+    $notification_type = "error";
+}
+
+// Function to decrypt password
+function decryptPassword($encrypted_data) {
+    try {
+        // Get encryption key
+        $encryption_key = hash('sha256', $_SESSION['user_id'] . 'your-secret-salt', true);
+        
+        // Decode the stored data
+        $decoded = base64_decode($encrypted_data);
+        
+        // Extract IV and encrypted data
+        $iv_length = openssl_cipher_iv_length('aes-256-cbc');
+        $iv = substr($decoded, 0, $iv_length);
+        $encrypted = substr($decoded, $iv_length);
+        
+        // Decrypt
+        return openssl_decrypt(
+            $encrypted,
+            'aes-256-cbc',
+            $encryption_key,
+            0,
+            $iv
+        );
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
+// Fetch user's passwords
+try {
+    $stmt = $pdo->prepare("SELECT * FROM passwords WHERE user_id = ? ORDER BY last_updated DESC");
+    $stmt->execute([$_SESSION['user_id']]);
+    $passwords = $stmt->fetchAll();
+    
+    // Decrypt usernames and passwords
+    foreach ($passwords as &$password) {
+        $password['username'] = decryptPassword($password['username']);
+        $password['password'] = decryptPassword($password['password']);
+    }
+} catch (PDOException $e) {
+    $error = "Error fetching passwords: " . $e->getMessage();
+    $passwords = [];
 }
 ?>
 <!DOCTYPE html>
@@ -210,6 +385,45 @@ if (isset($_GET['logout'])) {
             background-color: #0ca69a;
             transform: translateY(-2px);
         }
+        /* Add notification styles */
+        .notification {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #242424;
+            border: 1px solid #0D9488;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            min-width: 300px;
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -60%); }
+            to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; transform: translate(-50%, -50%); }
+            to { opacity: 0; transform: translate(-50%, -60%); }
+        }
+        .notification.fade-out {
+            animation: fadeOut 0.3s ease-out forwards;
+        }
+        .notification-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
     </style>
 </head>
 <body>
@@ -257,6 +471,47 @@ if (isset($_GET['logout'])) {
             <div class="main-content">
                 <h1 class="text-2xl font-semibold text-white mb-6">Passwords</h1>
 
+                <?php if (isset($error)): ?>
+                <div class="mb-4 p-4 bg-red-500 bg-opacity-20 border border-red-500 rounded-lg text-red-500">
+                    <?php echo htmlspecialchars($error); ?>
+                </div>
+                <?php endif; ?>
+
+                <?php if (isset($success)): ?>
+                <div id="success-notification" class="fixed bottom-4 left-4 <?php echo isset($notification_type) && $notification_type === 'error' ? 'bg-red-100 border-red-400 text-red-700' : 'bg-green-100 border-green-400 text-green-700'; ?> border px-4 py-3 rounded-lg shadow-lg z-50">
+                    <div class="flex items-center">
+                        <i class="ri-<?php echo isset($notification_type) && $notification_type === 'error' ? 'delete-bin-line' : 'checkbox-circle-line'; ?> text-xl mr-2"></i>
+                        <p><?php echo htmlspecialchars($success); ?></p>
+                    </div>
+                </div>
+                <script>
+                    // Auto close notification after 2 seconds
+                    setTimeout(() => {
+                        const notification = document.getElementById('success-notification');
+                        if (notification) {
+                            notification.remove();
+                        }
+                    }, 2000);
+                </script>
+                <?php endif; ?>
+
+                <!-- Delete Confirmation Modal -->
+                <div id="delete-confirmation-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 hidden">
+                    <div class="bg-[#242424] rounded-lg p-8 shadow-lg text-center max-w-xs w-full">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-medium text-white">Delete Password</h3>
+                            <button type="button" class="text-gray-400 hover:text-white" onclick="closeDeleteModal()">
+                                <i class="ri-close-line text-xl"></i>
+                            </button>
+                        </div>
+                        <p class="text-gray-400 text-sm mb-4">Are you sure you want to delete this password? This action cannot be undone.</p>
+                        <div class="flex space-x-2">
+                            <button type="button" class="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white" onclick="closeDeleteModal()">Cancel</button>
+                            <button type="button" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white" onclick="confirmDelete()">Delete</button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Search and Filter -->
                 <div class="mb-6">
                     <div class="flex flex-col md:flex-row gap-4">
@@ -292,20 +547,39 @@ if (isset($_GET['logout'])) {
                                 </tr>
                             </thead>
                             <tbody>
-                                <!-- Sample password entries -->
+                                <?php if (empty($passwords)): ?>
+                                <tr>
+                                    <td colspan="6" class="py-4 text-center text-gray-400">No passwords saved yet</td>
+                                </tr>
+                                <?php else: ?>
+                                <?php foreach ($passwords as $password): ?>
                                 <tr class="border-b border-gray-700 hover:bg-gray-700">
                                     <td class="py-2 px-4 border-b border-gray-700">
                                         <div class="flex items-center">
-                                            <!-- <?php $website_name = "Google"; ?> -->
-                                            <div class="w-8 h-8 flex items-center justify-center rounded-full bg-blue-600 mr-3 text-white text-xs">G</div>
-                                            <span class="font-medium text-white">Google</span>
+                                            <?php
+                                            // Generate a consistent color based on the website name
+                                            $colors = [
+                                                'bg-blue-600', 'bg-red-600', 'bg-green-600', 
+                                                'bg-yellow-600', 'bg-purple-600', 'bg-pink-600',
+                                                'bg-indigo-600', 'bg-teal-600', 'bg-orange-600'
+                                            ];
+                                            // Use the first character of the website name to determine the color
+                                            $firstChar = ord(strtolower(substr($password['website'], 0, 1)));
+                                            $colorIndex = $firstChar % count($colors);
+                                            $colorClass = $colors[$colorIndex];
+                                            ?>
+                                            <div class="w-8 h-8 flex items-center justify-center rounded-full <?php echo $colorClass; ?> mr-3 text-white text-xs">
+                                                <?php echo htmlspecialchars(strtoupper(substr($password['website'], 0, 1))); ?>
+                                            </div>
+                                            <span class="font-medium text-white"><?php echo htmlspecialchars($password['website']); ?></span>
                                         </div>
                                     </td>
-                                    <td class="py-2 px-4 border-b border-gray-700 text-sm">user@gmail.com</td>
+                                    <td class="py-2 px-4 border-b border-gray-700 text-sm"><?php echo htmlspecialchars($password['username']); ?></td>
                                     <td class="py-2 px-4 border-b border-gray-700">
                                         <div class="flex items-center">
-                                            <span class="text-gray-300">••••••••</span>
-                                            <button type="button" class="ml-2 text-gray-400 hover:text-white">
+                                            <span class="text-gray-300 password-mask">••••••••</span>
+                                            <button type="button" class="ml-2 text-gray-400 hover:text-white toggle-password" 
+                                                    data-password="<?php echo htmlspecialchars($password['password']); ?>">
                                                 <div class="w-5 h-5 flex items-center justify-center">
                                                     <i class="ri-eye-line"></i>
                                                 </div>
@@ -314,103 +588,36 @@ if (isset($_GET['logout'])) {
                                     </td>
                                     <td class="py-2 px-4 border-b border-gray-700">
                                         <div class="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
-                                            <div class="h-full bg-red-500" style="width: 40%"></div>
+                                            <div class="h-full <?php 
+                                                echo $password['strength'] === 'weak' ? 'bg-red-500' : 
+                                                    ($password['strength'] === 'medium' ? 'bg-orange-500' : 'bg-green-500'); 
+                                            ?>" style="width: <?php 
+                                                echo $password['strength'] === 'weak' ? '40%' : 
+                                                    ($password['strength'] === 'medium' ? '60%' : '80%'); 
+                                            ?>"></div>
                                         </div>
                                     </td>
-                                    <td class="py-2 px-4 border-b border-gray-700 text-sm text-gray-400">May 29, 2024</td>
+                                    <td class="py-2 px-4 border-b border-gray-700 text-sm text-gray-400">
+                                        <?php echo date('M d, Y', strtotime($password['last_updated'])); ?>
+                                    </td>
                                     <td class="py-2 px-4 border-b border-gray-700">
                                         <div class="flex space-x-2">
-                                             <button type="button" class="text-gray-400 hover:text-white" title="Copy password">
+                                            <button type="button" class="text-gray-400 hover:text-white copy-password" 
+                                                    data-password="<?php echo htmlspecialchars($password['password']); ?>" 
+                                                    title="Copy password">
                                                 <i class="ri-clipboard-line"></i>
                                             </button>
                                             <button type="button" class="text-gray-400 hover:text-white" title="Edit">
                                                 <i class="ri-edit-line"></i>
                                             </button>
-                                            <button type="button" class="text-gray-400 hover:text-white" title="Delete">
+                                            <button type="button" class="text-gray-400 hover:text-white" title="Delete" onclick="showDeleteModal(<?php echo $password['id']; ?>)">
                                                 <i class="ri-delete-bin-line"></i>
                                             </button>
                                         </div>
                                     </td>
                                 </tr>
-                                <!-- Add more sample entries here -->
-                                <tr class="border-b border-gray-700 hover:bg-gray-700">
-                                    <td class="py-2 px-4 border-b border-gray-700">
-                                        <div class="flex items-center">
-                                            <!-- <?php $website_name = "Facebook"; ?> -->
-                                            <div class="w-8 h-8 flex items-center justify-center rounded-full bg-blue-500 mr-3 text-white text-xs">F</div>
-                                            <span class="font-medium text-white">Facebook</span>
-                                        </div>
-                                    </td>
-                                    <td class="py-2 px-4 border-b border-gray-700 text-sm">alex.morgan</td>
-                                    <td class="py-2 px-4 border-b border-gray-700">
-                                        <div class="flex items-center">
-                                            <span class="text-gray-300">••••••••••</span>
-                                            <button type="button" class="ml-2 text-gray-400 hover:text-white">
-                                                <div class="w-5 h-5 flex items-center justify-center">
-                                                    <i class="ri-eye-line"></i>
-                                                </div>
-                                            </button>
-                                        </div>
-                                    </td>
-                                    <td class="py-2 px-4 border-b border-gray-700">
-                                        <div class="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
-                                            <div class="h-full bg-orange-500" style="width: 60%"></div>
-                                        </div>
-                                    </td>
-                                    <td class="py-2 px-4 border-b border-gray-700 text-sm text-gray-400">May 28, 2024</td>
-                                    <td class="py-2 px-4 border-b border-gray-700">
-                                        <div class="flex space-x-2">
-                                             <button type="button" class="text-gray-400 hover:text-white" title="Copy password">
-                                                <i class="ri-clipboard-line"></i>
-                                            </button>
-                                            <button type="button" class="text-gray-400 hover:text-white" title="Edit">
-                                                <i class="ri-edit-line"></i>
-                                            </button>
-                                            <button type="button" class="text-gray-400 hover:text-white" title="Delete">
-                                                <i class="ri-delete-bin-line"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr class="border-b border-gray-700 hover:bg-gray-700">
-                                    <td class="py-2 px-4 border-b border-gray-700">
-                                        <div class="flex items-center">
-                                            <!-- <?php $website_name = "Netflix"; ?> -->
-                                            <div class="w-8 h-8 flex items-center justify-center rounded-full bg-red-600 mr-3 text-white text-xs">N</div>
-                                            <span class="font-medium text-white">Netflix</span>
-                                        </div>
-                                    </td>
-                                    <td class="py-2 px-4 border-b border-gray-700 text-sm">user@email.com</td>
-                                    <td class="py-2 px-4 border-b border-gray-700">
-                                        <div class="flex items-center">
-                                            <span class="text-gray-300">••••••••••••</span>
-                                            <button type="button" class="ml-2 text-gray-400 hover:text-white">
-                                                <div class="w-5 h-5 flex items-center justify-center">
-                                                    <i class="ri-eye-line"></i>
-                                                </div>
-                                            </button>
-                                        </div>
-                                    </td>
-                                    <td class="py-2 px-4 border-b border-gray-700">
-                                        <div class="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
-                                            <div class="h-full bg-green-500" style="width: 80%"></div>
-                                        </div>
-                                    </td>
-                                    <td class="py-2 px-4 border-b border-gray-700 text-sm text-gray-400">May 25, 2024</td>
-                                    <td class="py-2 px-4 border-b border-gray-700">
-                                        <div class="flex space-x-2">
-                                             <button type="button" class="text-gray-400 hover:text-white" title="Copy password">
-                                                <i class="ri-clipboard-line"></i>
-                                            </button>
-                                            <button type="button" class="text-gray-400 hover:text-white" title="Edit">
-                                                <i class="ri-edit-line"></i>
-                                            </button>
-                                            <button type="button" class="text-gray-400 hover:text-white" title="Delete">
-                                                <i class="ri-delete-bin-line"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
+                                <?php endforeach; ?>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
@@ -444,24 +651,25 @@ if (isset($_GET['logout'])) {
                         <i class="ri-close-line text-xl"></i>
                     </button>
                 </div>
-                <form id="add-password-form" class="space-y-4">
+                <form id="add-password-form" method="POST" action="passwords.php" class="space-y-4">
+                    <input type="hidden" name="action" value="add_password">
                     <!-- Website Field -->
                     <div>
                         <label for="website" class="block text-sm font-medium text-gray-300 mb-1">Website/App</label>
-                        <input type="text" id="website" name="website" class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-secondary" placeholder="e.g., Google, Facebook">
+                        <input type="text" id="website" name="website" autocomplete="off" required class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-secondary" placeholder="e.g., Google, Facebook">
                     </div>
 
                     <!-- Username/Email Field -->
                     <div>
                         <label for="username" class="block text-sm font-medium text-gray-300 mb-1">Username/Email</label>
-                        <input type="text" id="username" name="username" class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-secondary" placeholder="Enter username or email">
+                        <input type="text" id="username" name="username" autocomplete="username" required class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-secondary" placeholder="Enter username or email">
                     </div>
 
                     <!-- Password Field -->
                     <div>
                         <label for="password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
                         <div class="relative">
-                            <input type="password" id="password" name="password" class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-secondary pr-10" placeholder="Enter password">
+                            <input type="password" id="password" name="password" autocomplete="new-password" required class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-secondary pr-10" placeholder="Enter password">
                             <button type="button" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white" onclick="togglePasswordVisibility()">
                                 <i class="ri-eye-line"></i>
                             </button>
@@ -688,14 +896,106 @@ if (isset($_GET['logout'])) {
 
         // Add event listener for form submission
         document.getElementById('add-password-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            // TODO: Add password saving logic
-            closeAddPasswordModal();
+            // Only handle password strength check and visibility toggle
+            const password = document.getElementById('password').value;
+            checkPasswordStrength(password);
         });
 
         // Reset timeout on modal interactions
         document.getElementById('add-password-modal').addEventListener('mousemove', resetActivityTimeout);
         document.getElementById('add-password-modal').addEventListener('keypress', resetActivityTimeout);
+
+        // Add password visibility toggle functionality
+        document.querySelectorAll('.toggle-password').forEach(button => {
+            button.addEventListener('click', function() {
+                const passwordMask = this.parentElement.querySelector('.password-mask');
+                const icon = this.querySelector('i');
+                const encryptedPassword = this.dataset.password;
+                
+                if (passwordMask.textContent === '••••••••') {
+                    // Decrypt and show password
+                    fetch('decrypt_password.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ password: encryptedPassword })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            passwordMask.textContent = data.password;
+                            icon.className = 'ri-eye-off-line';
+                        }
+                    });
+                } else {
+                    // Hide password
+                    passwordMask.textContent = '••••••••';
+                    icon.className = 'ri-eye-line';
+                }
+            });
+        });
+
+        // Add copy password functionality
+        document.querySelectorAll('.copy-password').forEach(button => {
+            button.addEventListener('click', function() {
+                const encryptedPassword = this.dataset.password;
+                
+                fetch('decrypt_password.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ password: encryptedPassword })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        navigator.clipboard.writeText(data.password).then(() => {
+                            // Show copied feedback
+                            const originalTitle = this.getAttribute('title');
+                            this.setAttribute('title', 'Copied!');
+                            setTimeout(() => {
+                                this.setAttribute('title', originalTitle);
+                            }, 2000);
+                        });
+                    }
+                });
+            });
+        });
+
+        // Delete Modal functions
+        let passwordToDelete = null;
+
+        function showDeleteModal(passwordId) {
+            passwordToDelete = passwordId;
+            document.getElementById('delete-confirmation-modal').classList.remove('hidden');
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('delete-confirmation-modal').classList.add('hidden');
+            passwordToDelete = null;
+        }
+
+        function confirmDelete() {
+            if (passwordToDelete) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.innerHTML = `
+                    <input type="hidden" name="action" value="delete_password">
+                    <input type="hidden" name="password_id" value="${passwordToDelete}">
+                `;
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+
+        // Close delete modal when clicking outside
+        document.getElementById('delete-confirmation-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeDeleteModal();
+            }
+        });
     </script>
 </body>
 </html> 
