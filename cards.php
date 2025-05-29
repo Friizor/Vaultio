@@ -64,7 +64,7 @@ if (isset($_GET['logout'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vaultio | Archive</title>
+    <title>Vaultio | Cards</title>
     <script src="https://cdn.tailwindcss.com/3.4.16"></script>
     <script>
         tailwind.config = {
@@ -256,63 +256,17 @@ if (isset($_GET['logout'])) {
 
             <!-- Main Content -->
             <div class="main-content">
-                <h1 class="text-2xl font-semibold text-white mb-6">Archive</h1>
+                <h1 class="text-2xl font-semibold text-white mb-6">Cards</h1>
 
-                <!-- Search and Filter -->
-                <div class="card mb-6">
-                    <div class="flex flex-col md:flex-row gap-4">
-                        <div class="flex-1">
-                            <div class="relative">
-                                <input type="text" placeholder="Search archive..." class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-secondary">
-                                <i class="ri-search-line absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                            </div>
-                        </div>
-                        <div class="flex gap-2">
-                            <button class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white flex items-center">
-                                <i class="ri-filter-3-line mr-2"></i> Filter
-                            </button>
-                            <button class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white flex items-center">
-                                <i class="ri-sort-asc mr-2"></i> Sort
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <!-- Add Cards content here -->
 
-                <!-- Archive List -->
-                <div class="card">
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead>
-                                <tr class="text-left border-b border-gray-700">
-                                    <th class="pb-3 font-medium text-gray-400">Type</th>
-                                    <th class="pb-3 font-medium text-gray-400">Name</th>
-                                    <th class="pb-3 font-medium text-gray-400">Archived Date</th>
-                                    <th class="pb-3 font-medium text-gray-400">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- Sample archived items -->
-                                <tr class="border-b border-gray-700 hover:bg-gray-700">
-                                    <td class="py-4 text-gray-300"><i class="ri-lock-2-line mr-2 text-secondary"></i> Password</td>
-                                    <td class="py-4 text-white">Old Email Account</td>
-                                    <td class="py-4 text-gray-400">May 15, 2024</td>
-                                    <td class="py-4">
-                                        <div class="flex space-x-2">
-                                            <button class="text-gray-400 hover:text-white" title="Restore">
-                                                <i class="ri-arrow-go-back-line"></i>
-                                            </button>
-                                            <button class="text-gray-400 hover:text-white" title="Delete">
-                                                <i class="ri-delete-bin-line"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
             </div>
         </div>
+
+        <!-- Add Card FAB -->
+        <button class="fab" onclick="showAddCardModal()">
+            <i class="ri-add-line text-2xl"></i>
+        </button>
 
         <!-- Logout Modal -->
         <div id="logout-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 hidden">
@@ -396,9 +350,15 @@ if (isset($_GET['logout'])) {
             window.location.href = 'login.php?logout=1';
         }
 
+        // Add Card Modal functions (to be implemented)
+        function showAddCardModal() {
+            // TODO: Implement add card modal
+            alert('Add Card functionality coming soon!');
+        }
+
         // Reset timeout on modal interactions
         document.getElementById('logout-modal').addEventListener('mousemove', resetActivityTimeout);
         document.getElementById('logout-modal').addEventListener('keypress', resetActivityTimeout);
     </script>
 </body>
-</html>
+</html> 
