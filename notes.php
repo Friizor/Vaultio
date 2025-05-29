@@ -332,6 +332,36 @@ if (isset($_GET['logout'])) {
     </div>
 
     <script>
+        let activityTimeout;
+        const timeoutDuration = 15 * 60 * 1000; // 15 minutes in milliseconds
+
+        function resetActivityTimeout() {
+            console.log('Activity detected, resetting timeout.');
+            clearTimeout(activityTimeout);
+
+            // Check for remember me cookie before setting timeout
+            // Look for a cookie name that is 64 characters long (SHA-256 hash)
+            const rememberMeCookieExists = Object.keys(document.cookie.split('; ').reduce((acc, cookie) => {
+                const [name, value] = cookie.split('=');
+                acc[name] = value;
+                return acc;
+            }, {})).some(name => name.length === 64);
+
+            if (!rememberMeCookieExists) {
+                activityTimeout = setTimeout(logout, timeoutDuration);
+            }
+        }
+
+        // Set up event listeners for user activity
+        window.onload = resetActivityTimeout;
+        document.onmousemove = resetActivityTimeout;
+        document.onkeypress = resetActivityTimeout;
+        document.onmousedown = resetActivityTimeout;
+        document.ontouchstart = resetActivityTimeout;
+        document.onclick = resetActivityTimeout;
+        document.onscroll = resetActivityTimeout;
+        document.onfocus = resetActivityTimeout;
+
         // Toggle sidebar visibility on mobile
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -375,6 +405,10 @@ if (isset($_GET['logout'])) {
             // TODO: Implement add note modal
             alert('Add Note functionality coming soon!');
         }
+
+        // Reset timeout on modal interactions
+        document.getElementById('logout-modal').addEventListener('mousemove', resetActivityTimeout);
+        document.getElementById('logout-modal').addEventListener('keypress', resetActivityTimeout);
     </script>
 </body>
 </html> 

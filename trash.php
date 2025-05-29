@@ -327,6 +327,14 @@ if (isset($_GET['logout'])) {
     </div>
 
     <script>
+        let activityTimeout;
+        const timeoutDuration = 15 * 60 * 1000; // 15 minutes in milliseconds
+
+        function resetActivityTimeout() {
+            clearTimeout(activityTimeout);
+            activityTimeout = setTimeout(logout, timeoutDuration);
+        }
+
         // Toggle sidebar visibility on mobile
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
