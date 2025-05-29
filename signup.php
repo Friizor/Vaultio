@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once 'db.php';
+require_once 'functions.php';
 
 // If user is already logged in, redirect to index.php
 if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
@@ -61,11 +62,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // If no errors, insert user
     if (empty($errors)) {
         $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-        $stmt = $pdo->prepare('INSERT INTO users (email, password, name) VALUES (?, ?, ?)');
-        $stmt->execute([$email, $hashed_password, $name]);
+        $user_id = generateUniqueUserId(); // Generate unique random ID
+        $stmt = $pdo->prepare('INSERT INTO users (id, email, password, name) VALUES (?, ?, ?, ?)');
+        $stmt->execute([$user_id, $email, $hashed_password, $name]);
         $_SESSION['logged_in'] = true;
         $_SESSION['user'] = $name;
         $_SESSION['user_email'] = $email;
+        $_SESSION['user_id'] = $user_id;
         header('Location: index.php');
         exit;
     }

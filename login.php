@@ -1,19 +1,89 @@
 <?php
 session_start();
+require_once 'db.php';
 
-// Check if user is already logged in
-if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
-    header('Location: index.php');
-    exit;
+// Auto-login from remember me cookie
+if (!isset($_SESSION['logged_in']) && isset($_COOKIE['rememberme'])) {
+    list($selector, $validator) = explode(':', $_COOKIE['rememberme']);
+    $stmt = $pdo->prepare('SELECT user_id, hashed_validator, expires FROM user_tokens WHERE selector = ? LIMIT 1');
+    $stmt->execute([$selector]);
+    $token = $stmt->fetch();
+    if ($token && hash_equals($token['hashed_validator'], hash('sha256', $validator)) && strtotime($token['expires']) > time()) {
+        $stmt = $pdo->prepare('SELECT * FROM users WHERE id = ? LIMIT 1');
+        $stmt->execute([$token['user_id']]);
+        $user = $stmt->fetch();
+        if ($user) {
+            $_SESSION['logged_in'] = true;
+            $_SESSION['user'] = $user['name'];
+            $_SESSION['user_email'] = $user['email'];
+            $_SESSION['user_id'] = $user['id'];
+            // Rotate token
+            $new_selector = bin2hex(random_bytes(6));
+            $new_validator = bin2hex(random_bytes(32));
+            $hashed_validator = hash('sha256', $new_validator);
+            $expires = date('Y-m-d H:i:s', time() + 60 * 60 * 24 * 5);
+            $pdo->prepare('DELETE FROM user_tokens WHERE selector = ?')->execute([$selector]);
+            $pdo->prepare('INSERT INTO user_tokens (user_id, selector, hashed_validator, expires) VALUES (?, ?, ?, ?)')->execute([$user['id'], $new_selector, $hashed_validator, $expires]);
+            // Set cookie with hashed timestamp as name
+            $cookie_name = hash('sha256', time());
+            setcookie($cookie_name, "$new_selector:$new_validator", time() + 60 * 60 * 24 * 5, '/', '', isset($_SERVER['HTTPS']), true);
+            header('Location: index.php');
+            exit;
+        }
+    } else {
+        setcookie('rememberme', '', time() - 3600, '/');
+    }
 }
 
 // Handle login form submission
+$errors = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Add your authentication logic here
-    // For demo purposes, we'll just set the session
-    $_SESSION['logged_in'] = true;
-    $_SESSION['user'] = 'John Doe'; // Replace with actual user data
-    header('Location: index.php');
+    require_once 'db.php';
+    $email = filter_var(trim($_POST['email']), FILTER_VALIDATE_EMAIL);
+    $password = $_POST['password'] ?? '';
+    $remember = isset($_POST['remember_me']);
+    if (!$email) {
+        $errors[] = 'Please enter a valid email address.';
+    }
+    if (empty($password)) {
+        $errors[] = 'Please enter your password.';
+    }
+    if (empty($errors)) {
+        $stmt = $pdo->prepare('SELECT * FROM users WHERE email = ? LIMIT 1');
+        $stmt->execute([$email]);
+        $user = $stmt->fetch();
+        if ($user && password_verify($password, $user['password'])) {
+            $_SESSION['logged_in'] = true;
+            $_SESSION['user'] = $user['name'];
+            $_SESSION['user_email'] = $user['email'];
+            $_SESSION['user_id'] = $user['id'];
+            // Remember Me logic
+            if ($remember) {
+                $selector = bin2hex(random_bytes(6));
+                $validator = bin2hex(random_bytes(32));
+                $hashed_validator = hash('sha256', $validator);
+                $expires = date('Y-m-d H:i:s', time() + 60 * 60 * 24 * 5);
+                $pdo->prepare('INSERT INTO user_tokens (user_id, selector, hashed_validator, expires) VALUES (?, ?, ?, ?)')->execute([$user['id'], $selector, $hashed_validator, $expires]);
+                // Set cookie with hashed timestamp as name
+                $cookie_name = hash('sha256', time());
+                setcookie($cookie_name, "$selector:$validator", time() + 60 * 60 * 24 * 5, '/', '', isset($_SERVER['HTTPS']), true);
+            }
+            header('Location: index.php');
+            exit;
+        } else {
+            $errors[] = 'Invalid email or password.';
+        }
+    }
+}
+// On logout, clear remember me token and cookie
+if (isset($_GET['logout'])) {
+    if (isset($_COOKIE['rememberme'])) {
+        list($selector) = explode(':', $_COOKIE['rememberme']);
+        $pdo->prepare('DELETE FROM user_tokens WHERE selector = ?')->execute([$selector]);
+        setcookie('rememberme', '', time() - 3600, '/');
+    }
+    session_destroy();
+    header('Location: login.php');
     exit;
 }
 ?>
@@ -190,7 +260,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="flex justify-center mb-6">
                 <h2 class="text-2xl font-semibold text-white">Sign in to your account</h2>
             </div>
-            <form method="POST" action="login.php">
+            <?php if (!empty($errors)): ?>
+                <div class="error-message bg-red-600 text-white p-3 rounded mb-4 text-center">
+                    <?php foreach ($errors as $error): ?>
+                        <div><?= htmlspecialchars($error) ?></div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+            <form method="POST" action="login.php" autocomplete="off">
                 <div class="input-group">
                     <div class="w-5 h-5 flex items-center justify-center input-icon">
                         <i class="ri-mail-line"></i>
@@ -207,9 +284,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 </div>
                 <div class="flex items-center justify-between mb-6">
-                    <div class="checkbox-container">
-                        <div id="remember-checkbox" class="custom-checkbox" onclick="toggleCheckbox('remember-checkbox')"></div>
-                        <label for="remember-checkbox" class="text-sm text-gray-400">Remember me</label>
+                    <div class="flex items-center">
+                        <input type="checkbox" id="remember_me" name="remember_me" class="form-checkbox mr-2 bg-transparent border-gray-500 text-secondary focus:ring-secondary" />
+                        <label for="remember_me" class="text-sm text-gray-400 cursor-pointer select-none">Remember me</label>
                     </div>
                     <a href="#" class="text-sm text-secondary hover:underline" onclick="showFeatureModal();return false;">Forgot password?</a>
                 </div>

@@ -1,14 +1,87 @@
 <?php
 session_start();
+require_once 'db.php';
 
-// Check if user is not logged in
+// If user is not logged in, try to auto-login from remember me cookie
+// This block runs *before* the inactivity check
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
-    header('Location: login.php');
+    // Find the remember me cookie by checking all cookies
+    $remember_cookie = null;
+    foreach ($_COOKIE as $name => $value) {
+        if (strlen($name) === 64) { // SHA-256 hash is 64 characters
+            $remember_cookie = $value;
+            $cookie_name = $name;
+            break;
+        }
+    }
+
+    if ($remember_cookie) {
+        list($selector, $validator) = explode(':', $remember_cookie);
+        $stmt = $pdo->prepare('SELECT user_id, hashed_validator, expires FROM user_tokens WHERE selector = ? LIMIT 1');
+        $stmt->execute([$selector]);
+        $token = $stmt->fetch();
+        if ($token && hash_equals($token['hashed_validator'], hash('sha256', $validator)) && strtotime($token['expires']) > time()) {
+            // Token is valid, log user in
+            $stmt = $pdo->prepare('SELECT * FROM users WHERE id = ? LIMIT 1');
+            $stmt->execute([$token['user_id']]);
+            $user = $stmt->fetch();
+            if ($user) {
+                $_SESSION['logged_in'] = true;
+                $_SESSION['user'] = $user['name'];
+                $_SESSION['user_email'] = $user['email'];
+                $_SESSION['user_id'] = $user['id'];
+                // Rotate token (optional but recommended)
+                $new_selector = bin2hex(random_bytes(6));
+                $new_validator = bin2hex(random_bytes(32));
+                $hashed_validator = hash('sha256', $new_validator);
+                $expires = date('Y-m-d H:i:s', time() + 60 * 60 * 24 * 5); // 5 days
+                $pdo->prepare('DELETE FROM user_tokens WHERE selector = ?')->execute([$selector]);
+                $pdo->prepare('INSERT INTO user_tokens (user_id, selector, hashed_validator, expires) VALUES (?, ?, ?, ?)')->execute([$user['id'], $new_selector, $hashed_validator, $expires]);
+                // Set new cookie with new hashed timestamp
+                $new_cookie_name = hash('sha256', time());
+                setcookie($new_cookie_name, "$new_selector:$new_validator", time() + 60 * 60 * 24 * 5, '/', '', isset($_SERVER['HTTPS']), true);
+                // Clear old cookie
+                setcookie($cookie_name, '', time() - 3600, '/');
+            }
+        } else {
+            // Invalid token, clear cookie
+            setcookie($cookie_name, '', time() - 3600, '/');
+        }
+    }
+    // If still not logged in after trying remember me, redirect
+    if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+         header('Location: login.php');
+         exit;
+    }
+}
+
+// Auto logout after 5 minutes of inactivity *only if no rememberme cookie*
+$timeout_duration = 20; // 5 minutes in seconds
+if (
+    isset($_SESSION['LAST_ACTIVITY']) && // Check if session activity timestamp exists
+    (time() - $_SESSION['LAST_ACTIVITY']) > $timeout_duration && // Check if inactive for longer than timeout
+    !array_filter($_COOKIE, function($name) { return strlen($name) === 64; }) // Check if no remember me cookie exists
+) {
+    // Inactive and no rememberme cookie, log out
+    session_unset();
+    session_destroy();
+    header('Location: login.php?timeout=1');
     exit;
 }
 
-// Handle logout
+// Update last activity timestamp (This always runs for active sessions)
+$_SESSION['LAST_ACTIVITY'] = time();
+
+// Handle manual logout
 if (isset($_GET['logout'])) {
+    // Clear session and remember me token/cookie
+    foreach ($_COOKIE as $name => $value) {
+        if (strlen($name) === 64) { // SHA-256 hash is 64 characters
+            list($selector) = explode(':', $value);
+            $pdo->prepare('DELETE FROM user_tokens WHERE selector = ?')->execute([$selector]);
+            setcookie($name, '', time() - 3600, '/');
+        }
+    }
     session_destroy();
     header('Location: login.php');
     exit;
@@ -385,7 +458,7 @@ if (isset($_GET['logout'])) {
                 <button type="button" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-700 hover:bg-gray-600">
                     <i class="ri-settings-3-line"></i>
                 </button>
-                <div class="w-8 h-8 flex items-center justify-center rounded-full bg-primary text-white cursor-pointer" onclick="showLogoutWarning()">
+                <div class="w-8 h-8 flex items-center justify-center rounded-full bg-primary text-white cursor-pointer" onclick="showLogoutModal()">
                     <span class="text-sm font-medium"><?php echo substr($_SESSION['user'], 0, 2); ?></span>
                 </div>
             </div>
@@ -396,14 +469,194 @@ if (isset($_GET['logout'])) {
 
     </div>
 
-    <script>
-        // Your existing JavaScript functions
-        // ... (keep all the existing JavaScript functions) ...
+    <!-- Logout Modal -->
+    <div id="logout-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 hidden">
+        <div class="bg-[#242424] rounded-lg p-8 shadow-lg text-center max-w-xs w-full">
+            <h3 class="text-lg font-medium text-white mb-2">Logout</h3>
+            <p class="text-gray-400 text-sm mb-4">Are you sure you want to logout?</p>
+            <div class="flex space-x-2">
+                <button type="button" class="btn btn-outline flex-1 !rounded-button" onclick="closeLogoutModal()">Cancel</button>
+                <button type="button" class="btn btn-primary flex-1 !rounded-button" onclick="logout()">Logout</button>
+            </div>
+        </div>
+    </div>
 
-        // Modify the logout function to use PHP
+    <!-- Auto Logout Warning -->
+    <!-- Keeping this for reference/potential future use, but will use the combined logic now -->
+    <div id="logout-warning" class="logout-warning hidden">
+        <div class="countdown">
+            <div class="countdown-progress"></div>
+        </div>
+        <h4 class="text-lg font-medium text-white mb-2">Session Timeout</h4>
+        <p class="text-gray-400 text-sm mb-4">Your session will expire in 2 minutes due to inactivity.</p>
+        <div class="flex space-x-2">
+            <button type="button" class="btn btn-outline flex-1 !rounded-button" onclick="logout()">Logout</button>
+            <button type="button" class="btn btn-primary flex-1 !rounded-button" onclick="staySignedIn()">Stay Signed In</button>
+        </div>
+    </div>
+
+    <script>
+        // Toggle password visibility
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            const passwordIcon = document.getElementById('password-icon');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                passwordIcon.className = 'ri-eye-line';
+            } else {
+                passwordInput.type = 'password';
+                passwordIcon.className = 'ri-eye-off-line';
+            }
+        }
+        
+        // Toggle master key visibility
+        function toggleMasterKey() {
+            const masterKeyInput = document.getElementById('master-key');
+            const masterKeyIcon = document.getElementById('master-key-icon');
+            
+            if (masterKeyInput.type === 'password') {
+                masterKeyInput.type = 'text';
+                masterKeyIcon.className = 'ri-eye-line';
+            } else {
+                masterKeyInput.type = 'password';
+                masterKeyIcon.className = 'ri-eye-off-line';
+            }
+        }
+        
+        // Toggle new password visibility
+        function toggleNewPassword() {
+            const newPasswordInput = document.getElementById('new-password');
+            const newPasswordIcon = document.getElementById('new-password-icon');
+            
+            if (newPasswordInput.type === 'password') {
+                newPasswordInput.type = 'text';
+                newPasswordIcon.className = 'ri-eye-line';
+            } else {
+                newPasswordInput.type = 'password';
+                newPasswordIcon.className = 'ri-eye-off-line';
+            }
+        }
+        
+        // Toggle checkbox
+        function toggleCheckbox(id) {
+            const checkbox = document.getElementById(id);
+            checkbox.classList.toggle('checked');
+        }
+        
+        // Show master key modal
+        function showMasterKeyModal() {
+            document.getElementById('master-key-modal').classList.remove('hidden');
+        }
+        
+        // Close master key modal
+        function closeMasterKeyModal() {
+            document.getElementById('master-key-modal').classList.add('hidden');
+        }
+        
+        // Unlock vault and show dashboard
+        function unlockVault() {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('master-key-modal').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+        }
+        
+        // Switch between tabs
+        function switchTab(tab) {
+            // Update tab buttons
+            document.getElementById('notes-tab').classList.remove('tab-active');
+            document.getElementById('passwords-tab').classList.remove('tab-active');
+            document.getElementById(tab + '-tab').classList.add('tab-active');
+            
+            // Update content
+            document.getElementById('notes-content').classList.add('hidden');
+            document.getElementById('passwords-content').classList.add('hidden');
+            document.getElementById(tab + '-content').classList.remove('hidden');
+        }
+        
+        // Show note editor
+        function showNoteEditor() {
+            document.getElementById('note-editor-modal').classList.remove('hidden');
+        }
+        
+        // Close note editor
+        function closeNoteEditor() {
+            document.getElementById('note-editor-modal').classList.add('hidden');
+        }
+        
+        // Show password modal
+        function showPasswordModal() {
+            document.getElementById('password-modal').classList.remove('hidden');
+        }
+        
+        // Close password modal
+        function closePasswordModal() {
+            document.getElementById('password-modal').classList.add('hidden');
+        }
+        
+        // Show logout warning
+        function showLogoutWarning() {
+            document.getElementById('logout-warning').classList.remove('hidden');
+        }
+        
+        // Stay signed in
+        function staySignedIn() {
+            document.getElementById('logout-warning').classList.add('hidden');
+        }
+        
+        // Logout
         function logout() {
             window.location.href = 'index.php?logout=1';
         }
+        
+        // Show logout modal
+        function showLogoutModal() {
+            document.getElementById('logout-modal').classList.remove('hidden');
+        }
+        
+        // Close logout modal
+        function closeLogoutModal() {
+            document.getElementById('logout-modal').classList.add('hidden');
+        }
+        
+        // Auto logout on inactivity (frontend) - Only if no rememberme cookie
+        let logoutTimeout;
+        function resetLogoutTimer() {
+            // Clear any existing timer
+            clearTimeout(logoutTimeout);
+
+            // Check if any cookie with 64-character name exists (our remember me cookie)
+            const hasRememberMeCookie = document.cookie.split(';').some((item) => {
+                const [name] = item.trim().split('=');
+                return name.length === 64;
+            });
+
+            // If no rememberme cookie, set the inactivity timer
+            if (!hasRememberMeCookie) {
+                logoutTimeout = setTimeout(() => {
+                    window.location.href = 'index.php?logout=1';
+                }, 300000); // 5 minutes (300000 ms)
+            }
+        }
+
+        // Reset the timer on user activity
+        ['click', 'mousemove', 'keydown', 'scroll', 'touchstart'].forEach(evt => {
+            document.addEventListener(evt, resetLogoutTimer, true);
+        });
+
+        // Initial timer start (only if no rememberme cookie exists on load)
+        document.addEventListener('DOMContentLoaded', function() {
+             const hasRememberMeCookie = document.cookie.split(';').some((item) => {
+                const [name] = item.trim().split('=');
+                return name.length === 64;
+             });
+             if (!hasRememberMeCookie) {
+                 resetLogoutTimer();
+             }
+             
+             // Set the active tab initially
+             switchTab('passwords');
+        });
     </script>
 </body>
 </html> 
