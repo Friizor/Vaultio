@@ -55,12 +55,21 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     }
 }
 
-// Auto logout after 5 minutes of inactivity *only if no rememberme cookie*
-$timeout_duration = 20; // 5 minutes in seconds
+
+$timeout_duration = 500; 
+
+$hasRememberMeCookie = false;
+foreach ($_COOKIE as $name => $value) {
+    if (strlen($name) === 64) {
+        $hasRememberMeCookie = true;
+        break;
+    }
+}
+
 if (
     isset($_SESSION['LAST_ACTIVITY']) && // Check if session activity timestamp exists
     (time() - $_SESSION['LAST_ACTIVITY']) > $timeout_duration && // Check if inactive for longer than timeout
-    !array_filter($_COOKIE, function($name) { return strlen($name) === 64; }) // Check if no remember me cookie exists
+    !$hasRememberMeCookie // Check if no remember me cookie exists using the flag
 ) {
     // Inactive and no rememberme cookie, log out
     session_unset();
@@ -92,9 +101,32 @@ if (isset($_GET['logout'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vaultio | Password and Notes Management</title>
+    <title>Vaultio | Dashboard</title>
     <script src="https://cdn.tailwindcss.com/3.4.16"></script>
-    <script>tailwind.config={theme:{extend:{colors:{primary:'#1E3A8A',secondary:'#0D9488'},borderRadius:{'none':'0px','sm':'4px',DEFAULT:'8px','md':'12px','lg':'16px','xl':'20px','2xl':'24px','3xl':'32px','full':'9999px','button':'8px'}}}}</script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1E3A8A',
+                        secondary: '#0D9488'
+                    },
+                    borderRadius: {
+                        'none': '0px',
+                        'sm': '4px',
+                        DEFAULT: '8px',
+                        'md': '12px',
+                        'lg': '16px',
+                        'xl': '20px',
+                        '2xl': '24px',
+                        '3xl': '32px',
+                        'full': '9999px',
+                        'button': '8px'
+                    }
+                }
+            }
+        }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
@@ -120,28 +152,96 @@ if (isset($_GET['logout'])) {
             padding: 0.75rem 1.5rem;
             background-color: #242424;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 20; /* Ensure navbar is above content */
+            position: relative;
         }
+        .dashboard-layout {
+            display: flex;
+            flex-grow: 1;
+        }
+
         .sidebar {
             width: 240px;
             background-color: #242424;
             border-right: 1px solid #333;
             padding: 1rem;
+            flex-shrink: 0;
+            transform: translateX(0);
+            transition: transform 0.3s ease-in-out;
+            z-index: 10;
         }
-        .content {
-            flex: 1;
+
+        .sidebar.hidden-mobile {
+             transform: translateX(-100%);
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                top: 64px; /* Below navbar */
+                bottom: 0;
+                left: 0;
+                height: calc(100vh - 64px);
+                overflow-y: auto;
+            }
+             .sidebar.hidden-mobile {
+                 transform: translateX(-100%);
+             }
+            .main-content {
+                 width: 100%;
+            }
+        }
+
+        .sidebar a {
+            display: flex; /* Use flex for icon and text alignment */
+            align-items: center;
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 6px;
+            color: #E5E5E5;
+            text-decoration: none;
+            transition: background-color 0.2s;
+        }
+
+        .sidebar a:hover {
+            background-color: #333;
+        }
+
+        .sidebar a.active {
+            background-color: #1E3A8A;
+            color: white;
+        }
+
+        .sidebar a i {
+            margin-right: 0.75rem; /* Spacing between icon and text */
+            font-size: 1.1rem;
+        }
+
+        .main-content {
+            flex-grow: 1;
             padding: 1.5rem;
             overflow-y: auto;
         }
-        .tab-active {
-            color: #0D9488;
-            border-bottom: 2px solid #0D9488;
-        }
+
         .card {
             background-color: #242424;
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             padding: 1.5rem;
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Added styles for a more refined look */
+        .text-secondary {
+            color: #0D9488;
+        }
+        .font-semibold {
+             font-weight: 600;
+        }
+
+        .tab-active {
+            color: #0D9488;
+            border-bottom: 2px solid #0D9488;
         }
         .tag {
             display: inline-flex;
@@ -433,70 +533,189 @@ if (isset($_GET['logout'])) {
     </style>
 </head>
 <body>
-    <!-- Main Dashboard -->
     <div class="app-container">
         <!-- Navbar -->
         <div class="navbar">
             <div class="flex items-center">
-                <h1 class="text-xl font-['Pacifico'] text-white mr-8">Vaultio</h1>
-                <div class="hidden md:flex space-x-4">
-                    <a href="#" class="text-white hover:text-secondary">Dashboard</a>
-                    <a href="#" class="text-gray-400 hover:text-secondary">Recent</a>
-                    <a href="#" class="text-gray-400 hover:text-secondary">Favorites</a>
-                </div>
-            </div>
-            <div class="search-container hidden md:block">
-                <div class="w-5 h-5 flex items-center justify-center search-icon">
-                    <i class="ri-search-line"></i>
-                </div>
-                <input type="text" class="search-input" placeholder="Search vault...">
+                <!-- Mobile menu button -->
+                <button id="mobile-menu-button" class="text-gray-400 hover:text-white focus:outline-none mr-4 md:hidden">
+                    <i class="ri-menu-line text-xl"></i>
+                </button>
+                 <img src="vaultioLogo.png" alt="Vaultio Logo" class="h-8 w-auto mr-2" /> <!-- Adjusted margin -->
+                <span class="text-xl font-semibold text-white">Vaultio</span>
             </div>
             <div class="flex items-center space-x-4">
-                <button type="button" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-700 hover:bg-gray-600">
+                 <!-- Search container - Optional, can be added later -->
+                 <!-- <div class="search-container hidden md:block">
+                      <div class="w-5 h-5 flex items-center justify-center search-icon">
+                          <i class="ri-search-line"></i>
+                      </div>
+                      <input type="text" class="search-input" placeholder="Search vault...">
+                  </div> -->
+                <button type="button" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-700 hover:bg-gray-600 text-gray-400 hover:text-white">
                     <i class="ri-notification-3-line"></i>
                 </button>
-                <button type="button" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-700 hover:bg-gray-600">
+                <button type="button" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-700 hover:bg-gray-600 text-gray-400 hover:text-white">
                     <i class="ri-settings-3-line"></i>
                 </button>
-                <div class="w-8 h-8 flex items-center justify-center rounded-full bg-primary text-white cursor-pointer" onclick="showLogoutModal()">
-                    <span class="text-sm font-medium"><?php echo substr($_SESSION['user'], 0, 2); ?></span>
+                <div class="w-9 h-9 flex items-center justify-center rounded-full bg-primary text-white cursor-pointer text-lg font-medium" onclick="showLogoutModal()"> <!-- Slightly larger and centered text -->
+                    <?php echo htmlspecialchars(strtoupper(substr($_SESSION['user'] ?? '', 0, 2))); ?> <!-- Ensure user is set and show uppercase initials -->
                 </div>
             </div>
         </div>
 
-        <!-- Rest of your existing dashboard content -->
-        <!-- ... (keep all the existing dashboard content) ... -->
+        <!-- Dashboard Layout -->
+        <div class="dashboard-layout">
+            <!-- Sidebar -->
+            <div id="sidebar" class="sidebar md:block"> <!-- Initially hidden on mobile, shown on medium screens -->
+                <?php
+                $current_page = basename($_SERVER['PHP_SELF']);
+                ?>
+                <a href="index.php" class="<?php echo $current_page === 'index.php' ? 'active' : ''; ?>"><i class="ri-dashboard-line"></i> Dashboard</a>
+                <a href="passwords.php" class="<?php echo $current_page === 'passwords.php' ? 'active' : ''; ?>"><i class="ri-lock-2-line"></i> Passwords</a>
+                <a href="notes.php" class="<?php echo $current_page === 'notes.php' ? 'active' : ''; ?>"><i class="ri-sticky-note-line"></i> Notes</a>
+                <a href="archive.php" class="<?php echo $current_page === 'archive.php' ? 'active' : ''; ?>"><i class="ri-archive-line"></i> Archive</a>
+                <a href="trash.php" class="<?php echo $current_page === 'trash.php' ? 'active' : ''; ?>"><i class="ri-delete-bin-line"></i> Trash</a>
+            </div>
 
-    </div>
+             <!-- Sidebar backdrop for mobile -->
+             <div id="sidebar-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-5 md:hidden hidden" onclick="toggleSidebar()"></div>
 
-    <!-- Logout Modal -->
-    <div id="logout-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 hidden">
-        <div class="bg-[#242424] rounded-lg p-8 shadow-lg text-center max-w-xs w-full">
-            <h3 class="text-lg font-medium text-white mb-2">Logout</h3>
-            <p class="text-gray-400 text-sm mb-4">Are you sure you want to logout?</p>
-            <div class="flex space-x-2">
-                <button type="button" class="btn btn-outline flex-1 !rounded-button" onclick="closeLogoutModal()">Cancel</button>
-                <button type="button" class="btn btn-primary flex-1 !rounded-button" onclick="logout()">Logout</button>
+            <!-- Main Content -->
+            <div class="main-content">
+                <h1 class="text-2xl font-semibold text-white mb-6">Dashboard Overview</h1>
+
+                <!-- Placeholder Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div class="card">
+                        <h2 class="text-lg font-medium mb-2 text-gray-300">Total Passwords</h2>
+                        <p class="text-3xl font-bold text-secondary">150</p>
+                    </div>
+                    <div class="card">
+                        <h2 class="text-lg font-medium mb-2 text-gray-300">Total Notes</h2>
+                        <p class="text-3xl font-bold text-secondary">35</p>
+                    </div>
+                    <div class="card">
+                        <h2 class="text-lg font-medium mb-2 text-gray-300">Recent Activity</h2>
+                        <ul>
+                            <li class="text-sm text-gray-400 mb-1">Logged in: Just now</li>
+                            <li class="text-sm text-gray-400">Added new password: Google</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Another Placeholder Section -->
+                <div class="card">
+                    <h2 class="text-xl font-semibold text-white mb-4">Quick Actions</h2>
+                    <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+                        <button class="btn btn-primary !rounded-button"><i class="ri-add-line mr-2"></i> Add Password</button>
+                        <button class="btn btn-outline !rounded-button"><i class="ri-add-line mr-2"></i> Add Note</button>
+                    </div>
+                </div>
+
+                <!-- Placeholder Table (similar to your existing table structure) -->
+                <div class="card">
+                    <h2 class="text-xl font-semibold text-white mb-4">Recently Added Items</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="bg-gray-800 text-left">
+                                    <th class="py-3 px-4 font-medium text-gray-400">Type</th>
+                                    <th class="py-3 px-4 font-medium text-gray-400">Name</th>
+                                    <th class="py-3 px-4 font-medium text-gray-400">Created</th>
+                                    <th class="py-3 px-4 font-medium text-gray-400">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="border-b border-gray-700 hover:bg-gray-700">
+                                    <td class="py-3 px-4 text-gray-300"><i class="ri-lock-2-line mr-2 text-secondary"></i> Password</td>
+                                    <td class="py-3 px-4 text-white">Google</td>
+                                    <td class="py-3 px-4 text-gray-400">May 29, 2025</td>
+                                    <td class="py-3 px-4">
+                                        <div class="flex space-x-2">
+                                            <button type="button" class="text-gray-400 hover:text-white" title="View">
+                                                <i class="ri-eye-line"></i>
+                                            </button>
+                                            <button type="button" class="text-gray-400 hover:text-white" title="Edit">
+                                                <i class="ri-edit-line"></i>
+                                            </button>
+                                            <button type="button" class="text-gray-400 hover:text-white" title="Delete">
+                                                <i class="ri-delete-bin-line"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr class="border-b border-gray-700 hover:bg-gray-700">
+                                    <td class="py-3 px-4 text-gray-300"><i class="ri-sticky-note-line mr-2 text-secondary"></i> Note</td>
+                                    <td class="py-3 px-4 text-white">Important Ideas</td>
+                                    <td class="py-3 px-4 text-gray-400">May 28, 2025</td>
+                                    <td class="py-3 px-4">
+                                        <div class="flex space-x-2">
+                                             <button type="button" class="text-gray-400 hover:text-white" title="View">
+                                                <i class="ri-eye-line"></i>
+                                            </button>
+                                            <button type="button" class="text-gray-400 hover:text-white" title="Edit">
+                                                <i class="ri-edit-line"></i>
+                                            </button>
+                                            <button type="button" class="text-gray-400 hover:text-white" title="Delete">
+                                                <i class="ri-delete-bin-line"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <!-- Add more rows as needed -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
             </div>
         </div>
-    </div>
 
-    <!-- Auto Logout Warning -->
-    <!-- Keeping this for reference/potential future use, but will use the combined logic now -->
-    <div id="logout-warning" class="logout-warning hidden">
-        <div class="countdown">
-            <div class="countdown-progress"></div>
+        <!-- Logout Modal -->
+         <div id="logout-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 hidden">
+            <div class="bg-[#242424] rounded-lg p-8 shadow-lg text-center max-w-xs w-full">
+                <h3 class="text-lg font-medium text-white mb-2">Logout</h3>
+                <p class="text-gray-400 text-sm mb-4">Are you sure you want to logout?</p>
+                <div class="flex space-x-2">
+                    <button type="button" class="btn btn-outline flex-1 !rounded-button" onclick="closeLogoutModal()">Cancel</button>
+                    <button type="button" class="btn btn-primary flex-1 !rounded-button" onclick="logout()">Logout</button>
+                </div>
+            </div>
         </div>
-        <h4 class="text-lg font-medium text-white mb-2">Session Timeout</h4>
-        <p class="text-gray-400 text-sm mb-4">Your session will expire in 2 minutes due to inactivity.</p>
-        <div class="flex space-x-2">
-            <button type="button" class="btn btn-outline flex-1 !rounded-button" onclick="logout()">Logout</button>
-            <button type="button" class="btn btn-primary flex-1 !rounded-button" onclick="staySignedIn()">Stay Signed In</button>
-        </div>
+
     </div>
 
     <script>
-        // Toggle password visibility
+        // Toggle sidebar visibility on mobile
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            sidebar.classList.toggle('hidden-mobile');
+            backdrop.classList.toggle('hidden');
+        }
+
+        // Event listener for the mobile menu button
+        document.getElementById('mobile-menu-button').addEventListener('click', toggleSidebar);
+
+        // Close sidebar when clicking outside on mobile
+        document.getElementById('sidebar-backdrop').addEventListener('click', toggleSidebar);
+
+        // Close sidebar when a link is clicked on mobile
+        document.querySelectorAll('#sidebar a').forEach(link => {
+            link.addEventListener('click', () => {
+                // Only toggle on mobile screens (width < 768px)
+                if (window.innerWidth < 768) {
+                    const sidebar = document.getElementById('sidebar');
+                    if (!sidebar.classList.contains('hidden-mobile')) {
+                        toggleSidebar();
+                    }
+                }
+            });
+        });
+
+
+        // Toggle password visibility (if you have password fields in the dashboard)
         function togglePassword() {
             const passwordInput = document.getElementById('password');
             const passwordIcon = document.getElementById('password-icon');
@@ -510,153 +729,23 @@ if (isset($_GET['logout'])) {
             }
         }
         
-        // Toggle master key visibility
-        function toggleMasterKey() {
-            const masterKeyInput = document.getElementById('master-key');
-            const masterKeyIcon = document.getElementById('master-key-icon');
-            
-            if (masterKeyInput.type === 'password') {
-                masterKeyInput.type = 'text';
-                masterKeyIcon.className = 'ri-eye-line';
-            } else {
-                masterKeyInput.type = 'password';
-                masterKeyIcon.className = 'ri-eye-off-line';
-            }
-        }
-        
-        // Toggle new password visibility
-        function toggleNewPassword() {
-            const newPasswordInput = document.getElementById('new-password');
-            const newPasswordIcon = document.getElementById('new-password-icon');
-            
-            if (newPasswordInput.type === 'password') {
-                newPasswordInput.type = 'text';
-                newPasswordIcon.className = 'ri-eye-line';
-            } else {
-                newPasswordInput.type = 'password';
-                newPasswordIcon.className = 'ri-eye-off-line';
-            }
-        }
-        
-        // Toggle checkbox
+        // Toggle checkbox (if you have checkboxes)
         function toggleCheckbox(id) {
             const checkbox = document.getElementById(id);
             checkbox.classList.toggle('checked');
         }
         
-        // Show master key modal
-        function showMasterKeyModal() {
-            document.getElementById('master-key-modal').classList.remove('hidden');
-        }
-        
-        // Close master key modal
-        function closeMasterKeyModal() {
-            document.getElementById('master-key-modal').classList.add('hidden');
-        }
-        
-        // Unlock vault and show dashboard
-        function unlockVault() {
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('master-key-modal').classList.add('hidden');
-            document.getElementById('dashboard').classList.remove('hidden');
-        }
-        
-        // Switch between tabs
-        function switchTab(tab) {
-            // Update tab buttons
-            document.getElementById('notes-tab').classList.remove('tab-active');
-            document.getElementById('passwords-tab').classList.remove('tab-active');
-            document.getElementById(tab + '-tab').classList.add('tab-active');
-            
-            // Update content
-            document.getElementById('notes-content').classList.add('hidden');
-            document.getElementById('passwords-content').classList.add('hidden');
-            document.getElementById(tab + '-content').classList.remove('hidden');
-        }
-        
-        // Show note editor
-        function showNoteEditor() {
-            document.getElementById('note-editor-modal').classList.remove('hidden');
-        }
-        
-        // Close note editor
-        function closeNoteEditor() {
-            document.getElementById('note-editor-modal').classList.add('hidden');
-        }
-        
-        // Show password modal
-        function showPasswordModal() {
-            document.getElementById('password-modal').classList.remove('hidden');
-        }
-        
-        // Close password modal
-        function closePasswordModal() {
-            document.getElementById('password-modal').classList.add('hidden');
-        }
-        
-        // Show logout warning
-        function showLogoutWarning() {
-            document.getElementById('logout-warning').classList.remove('hidden');
-        }
-        
-        // Stay signed in
-        function staySignedIn() {
-            document.getElementById('logout-warning').classList.add('hidden');
-        }
-        
-        // Logout
-        function logout() {
-            window.location.href = 'index.php?logout=1';
-        }
-        
-        // Show logout modal
+        // Logout Modal functions
         function showLogoutModal() {
             document.getElementById('logout-modal').classList.remove('hidden');
         }
-        
-        // Close logout modal
         function closeLogoutModal() {
             document.getElementById('logout-modal').classList.add('hidden');
         }
-        
-        // Auto logout on inactivity (frontend) - Only if no rememberme cookie
-        let logoutTimeout;
-        function resetLogoutTimer() {
-            // Clear any existing timer
-            clearTimeout(logoutTimeout);
-
-            // Check if any cookie with 64-character name exists (our remember me cookie)
-            const hasRememberMeCookie = document.cookie.split(';').some((item) => {
-                const [name] = item.trim().split('=');
-                return name.length === 64;
-            });
-
-            // If no rememberme cookie, set the inactivity timer
-            if (!hasRememberMeCookie) {
-                logoutTimeout = setTimeout(() => {
-                    window.location.href = 'index.php?logout=1';
-                }, 300000); // 5 minutes (300000 ms)
-            }
+        function logout() {
+            window.location.href = 'login.php?logout=1';
         }
 
-        // Reset the timer on user activity
-        ['click', 'mousemove', 'keydown', 'scroll', 'touchstart'].forEach(evt => {
-            document.addEventListener(evt, resetLogoutTimer, true);
-        });
-
-        // Initial timer start (only if no rememberme cookie exists on load)
-        document.addEventListener('DOMContentLoaded', function() {
-             const hasRememberMeCookie = document.cookie.split(';').some((item) => {
-                const [name] = item.trim().split('=');
-                return name.length === 64;
-             });
-             if (!hasRememberMeCookie) {
-                 resetLogoutTimer();
-             }
-             
-             // Set the active tab initially
-             switchTab('passwords');
-        });
     </script>
 </body>
-</html> 
+</html>
