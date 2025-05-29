@@ -210,6 +210,54 @@ if (isset($_GET['logout'])) {
             background-color: #0ca69a;
             transform: translateY(-2px);
         }
+        /* Styles for search, filter, sort copied from passwords.php, adapted for archive */
+        .search-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+        }
+        .search-input {
+            width: 100%;
+            padding: 0.5rem 1rem;
+            padding-left: 2.5rem;
+            background-color: #333;
+            border: 1px solid #444;
+            border-radius: 8px;
+            color: #E5E5E5;
+        }
+        .search-icon {
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #999;
+        }
+        #filter-dropdown, #sort-dropdown {
+            position: absolute;
+            background-color: #242424;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border: 1px solid #333;
+            z-index: 50;
+            padding: 0.5rem;
+        }
+        #filter-dropdown h3, #sort-dropdown h3 {
+            color: #999;
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+            padding: 0 0.5rem;
+        }
+        .filter-type, .sort-option {
+             width: 100%;
+             text-align: left;
+             padding: 0.5rem 0.75rem;
+             border-radius: 4px;
+             color: #E5E5E5;
+             transition: background-color 0.2s;
+        }
+         .filter-type:hover, .sort-option:hover {
+             background-color: #333;
+         }
     </style>
 </head>
 <body>
@@ -259,21 +307,61 @@ if (isset($_GET['logout'])) {
                 <h1 class="text-2xl font-semibold text-white mb-6">Archive</h1>
 
                 <!-- Search and Filter -->
-                <div class="card mb-6">
+                <div class="mb-6">
                     <div class="flex flex-col md:flex-row gap-4">
                         <div class="flex-1">
                             <div class="relative">
-                                <input type="text" placeholder="Search archive..." class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-secondary">
+                                <input type="text" id="search-input" placeholder="Search archive..." class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-secondary">
                                 <i class="ri-search-line absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                             </div>
                         </div>
                         <div class="flex gap-2">
-                            <button class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white flex items-center">
-                                <i class="ri-filter-3-line mr-2"></i> Filter
-                            </button>
-                            <button class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white flex items-center">
-                                <i class="ri-sort-asc mr-2"></i> Sort
-                            </button>
+                             <div class="relative">
+                                <button id="filter-button" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white flex items-center">
+                                    <i class="ri-filter-3-line mr-2"></i> Filter
+                                </button>
+                                <div id="filter-dropdown" class="absolute left-0 mt-2 w-48 bg-[#242424] rounded-lg shadow-lg border border-gray-700 hidden z-50">
+                                    <div class="p-2">
+                                        <h3 class="text-sm font-medium text-gray-300 mb-2">Filter by Type</h3>
+                                        <div class="space-y-1">
+                                            <button class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md filter-type" data-type="all">
+                                                All Types
+                                            </button>
+                                            <button class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md filter-type" data-type="Password">
+                                                Passwords
+                                            </button>
+                                            <button class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md filter-type" data-type="Note">
+                                                Notes
+                                            </button>
+                                            <!-- Add more types if needed -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="relative">
+                                <button id="sort-button" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white flex items-center">
+                                    <i class="ri-sort-asc mr-2"></i> Sort
+                                </button>
+                                <div id="sort-dropdown" class="absolute right-0 mt-2 w-48 bg-[#242424] rounded-lg shadow-lg border border-gray-700 hidden z-50">
+                                    <div class="p-2">
+                                        <h3 class="text-sm font-medium text-gray-300 mb-2">Sort by</h3>
+                                        <div class="space-y-1">
+                                            <button class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md sort-option" data-sort="name" data-order="asc">
+                                                <i class="ri-sort-alpha-asc mr-2"></i> Name (A-Z)
+                                            </button>
+                                            <button class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md sort-option" data-sort="name" data-order="desc">
+                                                <i class="ri-sort-alpha-desc mr-2"></i> Name (Z-A)
+                                            </button>
+                                            <button class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md sort-option" data-sort="date" data-order="desc">
+                                                <i class="ri-sort-desc mr-2"></i> Recently Archived
+                                            </button>
+                                            <button class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md sort-option" data-sort="date" data-order="asc">
+                                                <i class="ri-sort-asc mr-2"></i> Oldest First
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -399,6 +487,79 @@ if (isset($_GET['logout'])) {
         // Reset timeout on modal interactions
         document.getElementById('logout-modal').addEventListener('mousemove', resetActivityTimeout);
         document.getElementById('logout-modal').addEventListener('keypress', resetActivityTimeout);
+
+        // Add filter functionality for archive items
+        document.getElementById('filter-button').addEventListener('click', function(e) {
+            e.stopPropagation();
+            const dropdown = document.getElementById('filter-dropdown');
+            if (dropdown) {
+                dropdown.classList.toggle('hidden');
+            }
+        });
+
+        // Close filter dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            const dropdown = document.getElementById('filter-dropdown');
+            const filterButton = document.getElementById('filter-button');
+            if (dropdown && filterButton && !dropdown.contains(e.target) && !filterButton.contains(e.target)) {
+                dropdown.classList.add('hidden');
+            }
+        });
+
+        // Handle type filtering (placeholder for archive items)
+        document.querySelectorAll('.filter-type').forEach(button => {
+            button.addEventListener('click', function() {
+                const selectedType = this.dataset.type;
+                console.log('Filter archive by type:', selectedType);
+                // TODO: Implement actual filtering logic for archive items based on selectedType
+                const dropdown = document.getElementById('filter-dropdown');
+                if (dropdown) {
+                    dropdown.classList.add('hidden');
+                }
+            });
+        });
+
+        // Add sort functionality for archive items
+        document.getElementById('sort-button').addEventListener('click', function(e) {
+            e.stopPropagation();
+            const dropdown = document.getElementById('sort-dropdown');
+            if (dropdown) {
+                 dropdown.classList.toggle('hidden');
+            }
+        });
+
+        // Close sort dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            const dropdown = document.getElementById('sort-dropdown');
+            const sortButton = document.getElementById('sort-button');
+            if (dropdown && sortButton && !dropdown.contains(e.target) && !sortButton.contains(e.target)) {
+                dropdown.classList.add('hidden');
+            }
+        });
+
+        // Handle sorting (placeholder for archive items)
+        document.querySelectorAll('.sort-option').forEach(button => {
+            button.addEventListener('click', function() {
+                const sortBy = this.dataset.sort;
+                const order = this.dataset.order;
+                console.log('Sort archive by:', sortBy, order);
+                // TODO: Implement actual sorting logic for archive items
+                 const dropdown = document.getElementById('sort-dropdown');
+                 if (dropdown) {
+                    dropdown.classList.add('hidden');
+                 }
+            });
+        });
+
+        // Add search functionality for archive items
+        document.getElementById('search-input').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            console.log('Search archive for:', searchTerm);
+            // TODO: Implement actual search logic for archive items
+        });
+
+        // Reset timeout on search input
+        document.getElementById('search-input').addEventListener('input', resetActivityTimeout);
     </script>
 </body>
 </html>

@@ -690,9 +690,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
                 <!-- Password List Table (Regenerated) -->
                 <div class="bg-[#242424] rounded-lg overflow-hidden shadow-md mb-6">
-                    <div class="overflow-x-auto">
+                    <style>
+                        .table-container {
+                            max-height: calc(100vh - 300px);
+                            overflow-y: auto;
+                            scrollbar-width: thin;
+                            scrollbar-color: #0D9488 #242424;
+                        }
+                        .table-container::-webkit-scrollbar {
+                            width: 8px;
+                        }
+                        .table-container::-webkit-scrollbar-track {
+                            background: #242424;
+                            border-radius: 4px;
+                        }
+                        .table-container::-webkit-scrollbar-thumb {
+                            background: #0D9488;
+                            border-radius: 4px;
+                        }
+                        .table-container::-webkit-scrollbar-thumb:hover {
+                            background: #0ca69a;
+                        }
+                        .fixed-header {
+                            position: sticky;
+                            top: 0;
+                            z-index: 10;
+                            background-color: #1f2937; /* bg-gray-800 */
+                        }
+                        .fixed-header th {
+                            position: sticky;
+                            top: 0;
+                            background-color: #1f2937; /* bg-gray-800 */
+                            z-index: 10;
+                        }
+                    </style>
+                    <div class="table-container">
                         <table class="w-full">
-                            <thead>
+                            <thead class="fixed-header">
                                 <tr class="bg-gray-800 text-left">
                                     <th class="py-2 px-4 border-b border-gray-700">Website</th>
                                     <th class="py-2 px-4 border-b border-gray-700">Username/Email</th>
@@ -804,7 +838,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 </div>
 
                 <!-- Add Export PDF Button -->
-                <div class="flex justify-end mb-4">
+                <div class="flex justify-start mb-4">
                     <button id="export-pdf" class="px-4 py-2 bg-secondary hover:bg-teal-600 rounded-lg text-white flex items-center">
                         <i class="ri-file-pdf-line mr-2"></i> Export to PDF
                     </button>
