@@ -7,6 +7,51 @@ error_log("Session data: " . print_r($_SESSION, true));
 error_log("POST data: " . print_r($_POST, true));
 error_log("Request method: " . $_SERVER['REQUEST_METHOD']);
 
+// Handle AJAX request to fetch single password data
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'fetch_password') {
+    header('Content-Type: application/json');
+    // Allow requests from the same origin
+    header('Access-Control-Allow-Origin: ' . $_SERVER['HTTP_ORIGIN']);
+    header('Access-Control-Allow-Methods: POST');
+    header('Access-Control-Allow-Headers: Content-Type');
+
+    // Check if user is logged in
+    if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+        echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+        exit;
+    }
+
+    if (!isset($_POST['password_id'])) {
+        echo json_encode(['success' => false, 'message' => 'Password ID not provided']);
+        exit;
+    }
+
+    $passwordId = $_POST['password_id'];
+
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM passwords WHERE id = ? AND user_id = ? LIMIT 1");
+        $stmt->execute([$passwordId, $_SESSION['user_id']]);
+        $password = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($password) {
+            // Decrypt username and password before sending
+            $key = $_SESSION['user_id'] . 'your-secret-salt';
+            $password['username'] = decrypt($password['username'], $key);
+            $password['password'] = decrypt($password['password'], $key);
+
+            echo json_encode(['success' => true, 'password' => $password]);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Password not found']);
+        }
+
+    } catch (PDOException $e) {
+        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => 'Decryption error: ' . $e->getMessage()]);
+    }
+    exit; // Stop further execution after handling the AJAX request
+}
+
 // Authentication check
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     header('Location: login.php');
@@ -142,6 +187,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     } catch (Exception $e) {
         $error = $e->getMessage();
     }
+}
+
+// Handle password update (edit_password)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'edit_password') {
+    header('Content-Type: application/json');
+    // Allow requests from the same origin
+    header('Access-Control-Allow-Origin: ' . $_SERVER['HTTP_ORIGIN']);
+    header('Access-Control-Allow-Methods: POST');
+    header('Access-Control-Allow-Headers: Content-Type');
+
+    // Check if user is logged in
+    if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+        echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+        exit;
+    }
+
+    // Validate input
+    if (empty($_POST['password_id']) || empty($_POST['website']) || empty($_POST['username']) || empty($_POST['password']) || empty($_POST['category'])) {
+        echo json_encode(['success' => false, 'message' => 'All fields are required']);
+        exit;
+    }
+
+    $passwordId = $_POST['password_id'];
+    $website = trim($_POST['website']);
+    $username = $_POST['username']; // Will be re-encrypted
+    $password = $_POST['password']; // Will be re-encrypted
+    $category = trim($_POST['category']);
+
+    try {
+        // Get password strength (re-calculate as password might have changed)
+        $strength = 'weak';
+        $score = 0;
+        if (strlen($password) >= 8) $score += 25;
+        if (preg_match('/[a-z]/', $password)) $score += 25;
+        if (preg_match('/[A-Z]/', $password)) $score += 25;
+        if (preg_match('/[0-9]/', $password)) $score += 12.5;
+        if (preg_match('/[^A-Za-z0-9]/', $password)) $score += 12.5;
+
+        if ($score <= 25) $strength = 'weak';
+        else if ($score <= 50) $strength = 'medium';
+        else $strength = 'strong';
+
+        // Encrypt username and password
+        $key = $_SESSION['user_id'] . 'your-secret-salt';
+        $encrypted_username = encrypt($username, $key);
+        $encrypted_password = encrypt($password, $key);
+
+        // Update database
+        $stmt = $pdo->prepare("UPDATE passwords SET website = ?, username = ?, password = ?, password_length = ?, strength = ?, category = ?, last_updated = NOW() WHERE id = ? AND user_id = ?");
+        $result = $stmt->execute([
+            $website,
+            $encrypted_username,
+            $encrypted_password,
+            strlen($password),
+            $strength,
+            $category,
+            $passwordId,
+            $_SESSION['user_id']
+        ]);
+
+        if ($result) {
+            echo json_encode(['success' => true, 'message' => 'Password updated successfully!']);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Failed to update password']);
+        }
+
+    } catch (PDOException $e) {
+        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => 'Encryption/Decryption error: ' . $e->getMessage()]);
+    }
+    exit; // Stop further execution
 }
 
 // Handle password deletion
@@ -574,7 +691,7 @@ try {
                                                         title="Copy password">
                                                     <i class="ri-clipboard-line"></i>
                                                 </button>
-                                                <button type="button" class="text-gray-400 hover:text-white" title="Edit">
+                                                <button type="button" class="text-gray-400 hover:text-white edit-password-button" title="Edit" data-id="<?php echo $password['id']; ?>">
                                                     <i class="ri-edit-line"></i>
                                                 </button>
                                                 <button type="button" class="text-gray-400 hover:text-white" title="Delete" onclick="showDeleteModal(<?php echo $password['id']; ?>)">
@@ -628,6 +745,79 @@ try {
                     <button type="button" class="btn btn-outline flex-1 !rounded-button" onclick="closeLogoutModal()">Cancel</button>
                     <button type="button" class="btn btn-primary flex-1 !rounded-button" onclick="logout()">Logout</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Edit Password Modal -->
+        <div id="edit-password-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 hidden" onclick="handleModalClick(event)">
+            <div class="bg-[#242424] rounded-lg p-8 shadow-lg max-w-md w-full" onclick="event.stopPropagation()">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-lg font-medium text-white">Edit Password</h3>
+                    <button type="button" class="text-gray-400 hover:text-white" onclick="closeEditPasswordModal()">
+                        <i class="ri-close-line text-xl"></i>
+                    </button>
+                </div>
+                <form id="edit-password-form" method="POST" action="passwords.php" class="space-y-4">
+                    <input type="hidden" name="action" value="edit_password">
+                    <input type="hidden" name="password_id" id="edit-password-id">
+                    <!-- Website Field -->
+                    <div>
+                        <label for="edit-website" class="block text-sm font-medium text-gray-300 mb-1">Website/App</label>
+                        <input type="text" id="edit-website" name="website" autocomplete="off" required class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-secondary" placeholder="e.g., Google, Facebook">
+                    </div>
+
+                    <!-- Username/Email Field -->
+                    <div>
+                        <label for="edit-username" class="block text-sm font-medium text-gray-300 mb-1">Username/Email</label>
+                        <input type="text" id="edit-username" name="username" autocomplete="username" required class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-secondary" placeholder="Enter username or email">
+                    </div>
+
+                    <!-- Password Field -->
+                    <div>
+                        <label for="edit-password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
+                        <div class="relative">
+                            <input type="password" id="edit-password" name="password" autocomplete="new-password" required class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-secondary pr-10" placeholder="Enter password">
+                            <button type="button" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white toggle-password" onclick="togglePasswordVisibility('edit-password', this)">
+                                <i class="ri-eye-line"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                     <!-- Category Field -->
+                        <div>
+                            <label for="edit-category" class="block text-sm font-medium text-gray-300 mb-1">Category</label>
+                            <select id="edit-category" name="category" required class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-secondary">
+                                <option value="">Select a Category</option>
+                                <option value="Websites">Websites</option>
+                                <option value="Financial">Financial</option>
+                                <option value="Applications">Applications</option>
+                                <option value="Wi-Fi">Wi-Fi</option>
+                                 <option value="Social Media">Social Media</option>
+                            </select>
+                        </div>
+
+                    <!-- Password Strength Indicator - Optional for Edit -->
+                    <div id="edit-password-strength-section">
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Password Strength</label>
+                        <div class="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                            <div id="edit-password-strength-bar" class="h-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                        <p id="edit-password-strength-text" class="mt-1 text-sm text-gray-400">Enter a password to check strength</p>
+                    </div>
+
+                    <!-- Generate Password Button - Optional for Edit -->
+                    <div>
+                        <button type="button" class="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white flex items-center justify-center" onclick="generatePassword('edit-password', 'edit-password-strength-bar', 'edit-password-strength-text')">
+                            <i class="ri-refresh-line mr-2"></i> Generate Strong Password
+                        </button>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="flex space-x-2 pt-4">
+                        <button type="button" class="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white" onclick="closeEditPasswordModal()">Cancel</button>
+                        <button type="submit" class="flex-1 px-4 py-2 bg-secondary hover:bg-teal-600 rounded-lg text-white">Save Changes</button>
+                    </div>
+                </form>
             </div>
         </div>
 
@@ -787,15 +977,19 @@ try {
         }
 
         function handleModalClick(event) {
-            // Close modal if clicking the backdrop (outside the form container)
+            // Close add modal if clicking the backdrop (outside the form container)
             if (event.target.id === 'add-password-modal') {
                 closeAddPasswordModal();
             }
+             // Close edit modal if clicking the backdrop (outside the form container)
+            if (event.target.id === 'edit-password-modal') {
+                closeEditPasswordModal();
+            }
         }
 
-        function togglePasswordVisibility() {
-            const passwordInput = document.getElementById('password');
-            const icon = document.querySelector('#password + button i');
+        function togglePasswordVisibility(inputId, buttonElement) {
+            const passwordInput = document.getElementById(inputId);
+            const icon = buttonElement.querySelector('i');
             if (passwordInput.type === 'password') {
                 passwordInput.type = 'text';
                 icon.className = 'ri-eye-off-line';
@@ -805,7 +999,12 @@ try {
             }
         }
 
-        function checkPasswordStrength(password) {
+        function checkPasswordStrength(passwordInputId, strengthBarId, strengthTextId) {
+            const passwordInput = document.getElementById(passwordInputId);
+            const strengthBar = document.getElementById(strengthBarId);
+            const strengthText = document.getElementById(strengthTextId);
+            const password = passwordInput.value;
+
             let strength = 0;
             const feedback = [];
 
@@ -845,9 +1044,6 @@ try {
             }
 
             // Update strength bar
-            const strengthBar = document.getElementById('password-strength-bar');
-            const strengthText = document.getElementById('password-strength-text');
-
             strengthBar.style.width = strength + '%';
             
             if (strength <= 25) {
@@ -865,7 +1061,7 @@ try {
             }
         }
 
-        function generatePassword() {
+        function generatePassword(passwordInputId, strengthBarId, strengthTextId) {
             const length = 16;
             const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+~`|}{[]:;?><,./-=";
             let password = "";
@@ -886,7 +1082,7 @@ try {
             password = password.split('').sort(() => Math.random() - 0.5).join('');
 
             // Set the password and check its strength
-            const passwordInput = document.getElementById('password');
+            const passwordInput = document.getElementById(passwordInputId);
             passwordInput.value = password;
             checkPasswordStrength(password);
         }
@@ -990,6 +1186,9 @@ try {
                             // Optionally show an error feedback
                         });
                     }
+                }).catch(err => {
+                    console.error('Error decrypting password for copy:', err);
+                    alert('Error decrypting password for copy.');
                 });
             });
         });
@@ -1041,6 +1240,45 @@ try {
                 notification.remove();
             }, 3000);
         }
+
+        // Add event listeners for edit buttons
+        document.querySelectorAll('.edit-password-button').forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault(); // Prevent default button action
+                const passwordId = this.dataset.id;
+                
+                // Fetch password details via AJAX
+                const formData = new FormData();
+                formData.append('action', 'fetch_password');
+                formData.append('password_id', passwordId);
+
+                fetch('passwords.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const password = data.password;
+                        // Populate the edit modal form
+                        document.getElementById('edit-password-id').value = password.id;
+                        document.getElementById('edit-website').value = password.website;
+                        document.getElementById('edit-username').value = password.username;
+                        document.getElementById('edit-password').value = password.password;
+                        document.getElementById('edit-category').value = password.category;
+                        
+                        // Show the edit modal
+                        document.getElementById('edit-password-modal').classList.remove('hidden');
+                    } else {
+                        alert('Error fetching password details: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while fetching password details.');
+                });
+            });
+        });
     </script>
 </body>
 </html> 
