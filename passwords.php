@@ -258,7 +258,7 @@ if (isset($_GET['logout'])) {
                 <h1 class="text-2xl font-semibold text-white mb-6">Passwords</h1>
 
                 <!-- Search and Filter -->
-                <div class="card mb-6">
+                <div class="mb-6">
                     <div class="flex flex-col md:flex-row gap-4">
                         <div class="flex-1">
                             <div class="relative">
@@ -278,34 +278,118 @@ if (isset($_GET['logout'])) {
                 </div>
 
                 <!-- Passwords List -->
-                <div class="card">
+                <div class="bg-[#242424] rounded-lg overflow-hidden shadow-md mb-6">
                     <div class="overflow-x-auto">
                         <table class="w-full">
                             <thead>
-                                <tr class="text-left border-b border-gray-700">
-                                    <th class="pb-3 font-medium text-gray-400">Website/App</th>
-                                    <th class="pb-3 font-medium text-gray-400">Username</th>
-                                    <th class="pb-3 font-medium text-gray-400">Password</th>
-                                    <th class="pb-3 font-medium text-gray-400">Last Updated</th>
-                                    <th class="pb-3 font-medium text-gray-400">Actions</th>
+                                <tr class="bg-gray-800 text-left">
+                                    <th class="py-3 px-4 font-medium text-gray-400">Website/App</th>
+                                    <th class="py-3 px-4 font-medium text-gray-400">Username</th>
+                                    <th class="py-3 px-4 font-medium text-gray-400">Password</th>
+                                    <th class="py-3 px-4 font-medium text-gray-400">Last Updated</th>
+                                    <th class="py-3 px-4 font-medium text-gray-400">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <!-- Sample password entries -->
                                 <tr class="border-b border-gray-700 hover:bg-gray-700">
-                                    <td class="py-4 text-white">Google</td>
-                                    <td class="py-4 text-gray-300">user@gmail.com</td>
-                                    <td class="py-4 text-gray-300">••••••••</td>
-                                    <td class="py-4 text-gray-400">May 29, 2024</td>
-                                    <td class="py-4">
-                                        <div class="flex space-x-2">
-                                            <button class="text-gray-400 hover:text-white" title="View">
-                                                <i class="ri-eye-line"></i>
+                                    <td class="py-3 px-4">
+                                        <div class="flex items-center">
+                                            <?php $website_name = "Google"; // Replace with actual data retrieval ?>
+                                            <div class="w-8 h-8 flex items-center justify-center rounded-full bg-blue-600 mr-3 text-white text-xs"><?php echo htmlspecialchars(strtoupper(substr($website_name, 0, 1))); ?></div>
+                                            <span class="font-medium text-white"><?php echo htmlspecialchars($website_name); ?></span>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-4 text-gray-300">user@gmail.com</td>
+                                    <td class="py-3 px-4">
+                                        <div class="flex items-center">
+                                            <span class="text-gray-300">••••••••</span>
+                                            <button type="button" class="ml-2 text-gray-400 hover:text-white">
+                                                <div class="w-5 h-5 flex items-center justify-center">
+                                                    <i class="ri-eye-line"></i>
+                                                </div>
                                             </button>
-                                            <button class="text-gray-400 hover:text-white" title="Edit">
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-4 text-gray-400">May 29, 2024</td>
+                                    <td class="py-3 px-4">
+                                        <div class="flex space-x-2">
+                                             <button type="button" class="text-gray-400 hover:text-white" title="Copy password">
+                                                <i class="ri-clipboard-line"></i>
+                                            </button>
+                                            <button type="button" class="text-gray-400 hover:text-white" title="Edit">
                                                 <i class="ri-edit-line"></i>
                                             </button>
-                                            <button class="text-gray-400 hover:text-white" title="Delete">
+                                            <button type="button" class="text-gray-400 hover:text-white" title="Delete">
+                                                <i class="ri-delete-bin-line"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <!-- Add more sample entries here -->
+                                <tr class="border-b border-gray-700 hover:bg-gray-700">
+                                    <td class="py-3 px-4">
+                                        <div class="flex items-center">
+                                            <?php $website_name = "Facebook"; // Replace with actual data retrieval ?>
+                                            <div class="w-8 h-8 flex items-center justify-center rounded-full bg-blue-500 mr-3 text-white text-xs"><?php echo htmlspecialchars(strtoupper(substr($website_name, 0, 1))); ?></div>
+                                            <span class="font-medium text-white"><?php echo htmlspecialchars($website_name); ?></span>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-4 text-gray-300">alex.morgan</td>
+                                    <td class="py-3 px-4">
+                                        <div class="flex items-center">
+                                            <span class="text-gray-300">••••••••••</span>
+                                            <button type="button" class="ml-2 text-gray-400 hover:text-white">
+                                                <div class="w-5 h-5 flex items-center justify-center">
+                                                    <i class="ri-eye-line"></i>
+                                                </div>
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-4 text-gray-400">May 28, 2024</td>
+                                    <td class="py-3 px-4">
+                                        <div class="flex space-x-2">
+                                             <button type="button" class="text-gray-400 hover:text-white" title="Copy password">
+                                                <i class="ri-clipboard-line"></i>
+                                            </button>
+                                            <button type="button" class="text-gray-400 hover:text-white" title="Edit">
+                                                <i class="ri-edit-line"></i>
+                                            </button>
+                                            <button type="button" class="text-gray-400 hover:text-white" title="Delete">
+                                                <i class="ri-delete-bin-line"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr class="border-b border-gray-700 hover:bg-gray-700">
+                                    <td class="py-3 px-4">
+                                        <div class="flex items-center">
+                                            <?php $website_name = "Netflix"; // Replace with actual data retrieval ?>
+                                            <div class="w-8 h-8 flex items-center justify-center rounded-full bg-red-600 mr-3 text-white text-xs"><?php echo htmlspecialchars(strtoupper(substr($website_name, 0, 1))); ?></div>
+                                            <span class="font-medium text-white"><?php echo htmlspecialchars($website_name); ?></span>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-4 text-gray-300">user@email.com</td>
+                                    <td class="py-3 px-4">
+                                        <div class="flex items-center">
+                                            <span class="text-gray-300">••••••••••••</span>
+                                            <button type="button" class="ml-2 text-gray-400 hover:text-white">
+                                                <div class="w-5 h-5 flex items-center justify-center">
+                                                    <i class="ri-eye-line"></i>
+                                                </div>
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-4 text-gray-400">May 25, 2024</td>
+                                    <td class="py-3 px-4">
+                                        <div class="flex space-x-2">
+                                             <button type="button" class="text-gray-400 hover:text-white" title="Copy password">
+                                                <i class="ri-clipboard-line"></i>
+                                            </button>
+                                            <button type="button" class="text-gray-400 hover:text-white" title="Edit">
+                                                <i class="ri-edit-line"></i>
+                                            </button>
+                                            <button type="button" class="text-gray-400 hover:text-white" title="Delete">
                                                 <i class="ri-delete-bin-line"></i>
                                             </button>
                                         </div>
