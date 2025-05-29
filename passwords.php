@@ -85,9 +85,15 @@ function decrypt($data, $key) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_password') {
     try {
         // Validate input
-        if (empty($_POST['website']) || empty($_POST['username']) || empty($_POST['password'])) {
+        if (empty($_POST['website']) || empty($_POST['username']) || empty($_POST['password']) || empty($_POST['category'])) {
             throw new Exception('All fields are required');
         }
+
+        // Sanitize website name
+        $website = trim($_POST['website']);
+
+        // Sanitize category
+        $category = trim($_POST['category']);
 
         // Get password strength
         $password = $_POST['password'];
@@ -115,14 +121,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $encrypted_password = encrypt($password, $key);
 
         // Insert into database
-        $stmt = $pdo->prepare("INSERT INTO passwords (user_id, website, username, password, password_length, strength) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt = $pdo->prepare("INSERT INTO passwords (user_id, website, username, password, password_length, strength, category) VALUES (?, ?, ?, ?, ?, ?, ?)");
         $result = $stmt->execute([
             $_SESSION['user_id'],
-            $_POST['website'],
+            $website,
             $encrypted_username,
             $encrypted_password,
             strlen($password),
-            $strength
+            $strength,
+            $category
         ]);
 
         if (!$result) {
@@ -481,6 +488,7 @@ try {
                                     <th class="py-2 px-4 border-b border-gray-700">Username/Email</th>
                                     <th class="py-2 px-4 border-b border-gray-700">Password</th>
                                     <th class="py-2 px-4 border-b border-gray-700">Password Length</th>
+                                    <th class="py-2 px-4 border-b border-gray-700">Category</th>
                                     <th class="py-2 px-4 border-b border-gray-700">Last Updated</th>
                                     <th class="py-2 px-4 border-b border-gray-700">Actions</th>
                                 </tr>
@@ -495,7 +503,7 @@ try {
 
                                     if (empty($passwords_new)): ?>
                                     <tr>
-                                        <td colspan="6" class="py-4 text-center text-gray-400">No passwords saved yet</td>
+                                        <td colspan="7" class="py-4 text-center text-gray-400">No passwords saved yet</td>
                                     </tr>
                                     <?php else: ?>
                                     <?php foreach ($passwords_new as $password): ?>
@@ -555,6 +563,7 @@ try {
                                                 ?>"></div>
                                             </div>
                                         </td>
+                                        <td class="py-2 px-4 border-b border-gray-700 text-sm"><?php echo htmlspecialchars($password['category']); ?></td>
                                         <td class="py-2 px-4 border-b border-gray-700 text-sm text-gray-400">
                                             <?php echo date('M d, Y', strtotime($password['last_updated'])); ?>
                                         </td>
@@ -578,7 +587,7 @@ try {
                                 <?php endif; ?>
                                 <?php
                                 } catch (PDOException $e) {
-                                    echo "<tr><td colspan=\"6\" class=\"py-4 text-center text-red-500\">Error fetching passwords: " . htmlspecialchars($e->getMessage()) . "</td></tr>";
+                                    echo "<tr><td colspan=\"7\" class=\"py-4 text-center text-red-500\">Error fetching passwords: " . htmlspecialchars($e->getMessage()) . "</td></tr>";
                                 }
                                 ?>
                             </tbody>
@@ -654,6 +663,19 @@ try {
                                 <i class="ri-eye-line"></i>
                             </button>
                         </div>
+                    </div>
+
+                    <!-- Category Field -->
+                    <div>
+                        <label for="category" class="block text-sm font-medium text-gray-300 mb-1">Category</label>
+                        <select id="category" name="category" required class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-secondary">
+                            <option value="">Select a Category</option>
+                            <option value="Websites">Websites</option>
+                            <option value="Financial">Financial</option>
+                            <option value="Applications">Applications</option>
+                            <option value="Wi-Fi">Wi-Fi</option>
+                            <option value="Social Media">Social Media</option>
+                        </select>
                     </div>
 
                     <!-- Password Strength Indicator -->
