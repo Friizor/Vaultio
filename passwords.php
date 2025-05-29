@@ -197,32 +197,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     header('Access-Control-Allow-Methods: POST');
     header('Access-Control-Allow-Headers: Content-Type');
 
+    // Debug log received POST data
+    error_log("Edit password POST data: " . print_r($_POST, true));
+
     // Check if user is logged in
     if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+        error_log("Unauthorized attempt to edit password");
         echo json_encode(['success' => false, 'message' => 'Unauthorized']);
         exit;
     }
 
-    // Validate input
-    if (empty($_POST['password_id']) || empty($_POST['website']) || empty($_POST['username']) || empty($_POST['password']) || empty($_POST['category'])) {
-        echo json_encode(['success' => false, 'message' => 'All fields are required']);
-        exit;
-    }
-
-    $passwordId = $_POST['password_id'];
-    $website = trim($_POST['website']);
-    $username = $_POST['username']; // Will be re-encrypted
-    $password = $_POST['password']; // Will be re-encrypted
-    $category = trim($_POST['category']);
-
     try {
-        // Get password strength (re-calculate as password might have changed)
+        // Validate input
+        if (empty($_POST['password_id']) || empty($_POST['website']) || empty($_POST['username']) || empty($_POST['password']) || empty($_POST['category'])) {
+            throw new Exception('All fields are required');
+        }
+
+        $passwordId = $_POST['password_id'];
+        $website = trim($_POST['website']);
+        $username = $_POST['username'];
+        $password = $_POST['password'];
+        $category = trim($_POST['category']);
+
+        // Get password strength
         $strength = 'weak';
         $score = 0;
+
+        // Length check
         if (strlen($password) >= 8) $score += 25;
+        // Lowercase check
         if (preg_match('/[a-z]/', $password)) $score += 25;
+        // Uppercase check
         if (preg_match('/[A-Z]/', $password)) $score += 25;
+        // Number check
         if (preg_match('/[0-9]/', $password)) $score += 12.5;
+        // Special character check
         if (preg_match('/[^A-Za-z0-9]/', $password)) $score += 12.5;
 
         if ($score <= 25) $strength = 'weak';
@@ -248,17 +257,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         ]);
 
         if ($result) {
+            error_log("Password ID " . $passwordId . " updated successfully");
             echo json_encode(['success' => true, 'message' => 'Password updated successfully!']);
         } else {
-            echo json_encode(['success' => false, 'message' => 'Failed to update password']);
+            error_log("Database execute failed for password ID " . $passwordId);
+            // Log detailed error if available (PDO errors might not always throw exceptions for execute)
+            $errorInfo = $stmt->errorInfo();
+            error_log("PDO Error Info: " . print_r($errorInfo, true));
+            throw new Exception('Failed to update password');
         }
 
     } catch (PDOException $e) {
+        error_log("Database error in edit_password: " . $e->getMessage());
         echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
     } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => 'Encryption/Decryption error: ' . $e->getMessage()]);
+        error_log("Error in edit_password: " . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
-    exit; // Stop further execution
+    exit; // Stop further execution after handling the AJAX request
 }
 
 // Handle password deletion
@@ -760,6 +776,7 @@ try {
                 <form id="edit-password-form" method="POST" action="passwords.php" class="space-y-4">
                     <input type="hidden" name="action" value="edit_password">
                     <input type="hidden" name="password_id" id="edit-password-id">
+
                     <!-- Website Field -->
                     <div>
                         <label for="edit-website" class="block text-sm font-medium text-gray-300 mb-1">Website/App</label>
@@ -849,7 +866,7 @@ try {
                         <label for="password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
                         <div class="relative">
                             <input type="password" id="password" name="password" autocomplete="new-password" required class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-secondary pr-10" placeholder="Enter password">
-                            <button type="button" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white" onclick="togglePasswordVisibility()">
+                            <button type="button" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white toggle-password" onclick="togglePasswordVisibility('password', this)">
                                 <i class="ri-eye-line"></i>
                             </button>
                         </div>
@@ -879,7 +896,7 @@ try {
 
                     <!-- Generate Password Button -->
                     <div>
-                        <button type="button" class="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white flex items-center justify-center" onclick="generatePassword()">
+                        <button type="button" class="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white flex items-center justify-center" onclick="generatePassword('password', 'password-strength-bar', 'password-strength-text')">
                             <i class="ri-refresh-line mr-2"></i> Generate Strong Password
                         </button>
                     </div>
@@ -1084,24 +1101,115 @@ try {
             // Set the password and check its strength
             const passwordInput = document.getElementById(passwordInputId);
             passwordInput.value = password;
-            checkPasswordStrength(password);
+            checkPasswordStrength(passwordInputId, strengthBarId, strengthTextId);
         }
 
-        // Add event listener for password strength checking
+        // Edit Password Modal functions
+        function showEditPasswordModal(passwordId, website, username, password, category) {
+            // Set the password ID in the hidden input
+            document.getElementById('edit-password-id').value = passwordId;
+            
+            // Set other form fields, trimming whitespace from username
+            document.getElementById('edit-website').value = website;
+            document.getElementById('edit-username').value = username.trim(); // Trim whitespace
+            document.getElementById('edit-password').value = password;
+            document.getElementById('edit-category').value = category;
+            
+            // Check password strength
+            checkPasswordStrength('edit-password', 'edit-password-strength-bar', 'edit-password-strength-text');
+            
+            // Show the modal
+            document.getElementById('edit-password-modal').classList.remove('hidden');
+        }
+
+        function closeEditPasswordModal() {
+            document.getElementById('edit-password-modal').classList.add('hidden');
+            document.getElementById('edit-password-form').reset();
+            // Reset password strength indicator
+            document.getElementById('edit-password-strength-bar').style.width = '0%';
+            document.getElementById('edit-password-strength-text').textContent = 'Enter a password to check strength';
+            document.getElementById('edit-password-strength-bar').className = 'h-full transition-all duration-300';
+        }
+
+        function handleModalClick(event) {
+            // Close add modal if clicking the backdrop (outside the form container)
+            if (event.target.id === 'add-password-modal') {
+                closeAddPasswordModal();
+            }
+            // Close edit modal if clicking the backdrop (outside the form container)
+            if (event.target.id === 'edit-password-modal') {
+                closeEditPasswordModal();
+            }
+        }
+
+        // Add event listener for password strength checking on add modal
         document.getElementById('password').addEventListener('input', function(e) {
-            checkPasswordStrength(e.target.value);
+            checkPasswordStrength('password', 'password-strength-bar', 'password-strength-text');
         });
 
-        // Add event listener for form submission
+        // Add event listener for password strength checking on edit modal
+        document.getElementById('edit-password').addEventListener('input', function(e) {
+            checkPasswordStrength('edit-password', 'edit-password-strength-bar', 'edit-password-strength-text');
+        });
+
+        // Add event listener for form submission on edit modal (Handle via AJAX)
+        document.getElementById('edit-password-form').addEventListener('submit', function(e) {
+            e.preventDefault(); // Prevent default form submission
+
+            const form = e.target;
+            const formData = new FormData(form);
+
+            // Debug log formData content
+            console.log('FormData content:');
+            for (let pair of formData.entries()) {
+                console.log(pair[0]+ ': ' + pair[1]);
+            }
+
+            // Log the URL being fetched
+            console.log('Fetching to:', form.action, 'with method:', form.method);
+
+            fetch('passwords.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.text();
+            })
+            .then(text => {
+                try {
+                    const data = JSON.parse(text);
+                    if (data.success) {
+                        alert('Password updated successfully!');
+                        closeEditPasswordModal();
+                        window.location.reload();
+                    } else {
+                        alert('Error: ' + (data.message || 'Failed to update password'));
+                    }
+                } catch (e) {
+                    console.error('Error parsing response:', text);
+                    alert('Error updating password. Please try again.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while saving changes. Please try again.');
+            });
+        });
+
+        // Add event listener for form submission on add modal
         document.getElementById('add-password-form').addEventListener('submit', function(e) {
-            // Only handle password strength check and visibility toggle
-            const password = document.getElementById('password').value;
-            checkPasswordStrength(password);
+            // Password strength check is already handled by input event
+            // This submit handler can be used for additional validation or AJAX submission if needed later
         });
 
         // Reset timeout on modal interactions
         document.getElementById('add-password-modal').addEventListener('mousemove', resetActivityTimeout);
         document.getElementById('add-password-modal').addEventListener('keypress', resetActivityTimeout);
+        document.getElementById('edit-password-modal').addEventListener('mousemove', resetActivityTimeout);
+        document.getElementById('edit-password-modal').addEventListener('keypress', resetActivityTimeout);
 
         // Add password visibility toggle functionality
         document.querySelectorAll('.toggle-password').forEach(button => {
@@ -1243,40 +1351,30 @@ try {
 
         // Add event listeners for edit buttons
         document.querySelectorAll('.edit-password-button').forEach(button => {
-            button.addEventListener('click', function(e) {
-                e.preventDefault(); // Prevent default button action
+            button.addEventListener('click', function() {
                 const passwordId = this.dataset.id;
+                const row = this.closest('tr');
                 
-                // Fetch password details via AJAX
-                const formData = new FormData();
-                formData.append('action', 'fetch_password');
-                formData.append('password_id', passwordId);
+                if (!row) {
+                    console.error('Could not find table row for edit button.');
+                    return;
+                }
 
-                fetch('passwords.php', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        const password = data.password;
-                        // Populate the edit modal form
-                        document.getElementById('edit-password-id').value = password.id;
-                        document.getElementById('edit-website').value = password.website;
-                        document.getElementById('edit-username').value = password.username;
-                        document.getElementById('edit-password').value = password.password;
-                        document.getElementById('edit-category').value = password.category;
-                        
-                        // Show the edit modal
-                        document.getElementById('edit-password-modal').classList.remove('hidden');
-                    } else {
-                        alert('Error fetching password details: ' + data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('An error occurred while fetching password details.');
-                });
+                // Get data from the row
+                const website = row.querySelector('td:first-child span').textContent;
+                const username = row.querySelector('td:nth-child(2)').textContent;
+                const passwordMask = row.querySelector('.password-mask');
+                const password = passwordMask ? passwordMask.dataset.password : '';
+                const category = row.querySelector('td:nth-child(5)').textContent;
+
+                if (!password) {
+                    console.error('Could not find password data.');
+                    alert('Error: Could not retrieve password data.');
+                    return;
+                }
+
+                // Show the edit modal with the data
+                showEditPasswordModal(passwordId, website, username, password, category);
             });
         });
     </script>
