@@ -283,25 +283,26 @@ if (isset($_GET['logout'])) {
                         <table class="w-full">
                             <thead>
                                 <tr class="bg-gray-800 text-left">
-                                    <th class="py-3 px-4 font-medium text-gray-400">Website/App</th>
-                                    <th class="py-3 px-4 font-medium text-gray-400">Username</th>
-                                    <th class="py-3 px-4 font-medium text-gray-400">Password</th>
-                                    <th class="py-3 px-4 font-medium text-gray-400">Last Updated</th>
-                                    <th class="py-3 px-4 font-medium text-gray-400">Actions</th>
+                                    <th class="py-2 px-4 border-b border-gray-700">Website</th>
+                                    <th class="py-2 px-4 border-b border-gray-700">Username/Email</th>
+                                    <th class="py-2 px-4 border-b border-gray-700">Password</th>
+                                    <th class="py-2 px-4 border-b border-gray-700">Password Length</th>
+                                    <th class="py-2 px-4 border-b border-gray-700">Last Updated</th>
+                                    <th class="py-2 px-4 border-b border-gray-700">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <!-- Sample password entries -->
                                 <tr class="border-b border-gray-700 hover:bg-gray-700">
-                                    <td class="py-3 px-4">
+                                    <td class="py-2 px-4 border-b border-gray-700">
                                         <div class="flex items-center">
-                                            <?php $website_name = "Google"; // Replace with actual data retrieval ?>
-                                            <div class="w-8 h-8 flex items-center justify-center rounded-full bg-blue-600 mr-3 text-white text-xs"><?php echo htmlspecialchars(strtoupper(substr($website_name, 0, 1))); ?></div>
-                                            <span class="font-medium text-white"><?php echo htmlspecialchars($website_name); ?></span>
+                                            <!-- <?php $website_name = "Google"; ?> -->
+                                            <div class="w-8 h-8 flex items-center justify-center rounded-full bg-blue-600 mr-3 text-white text-xs">G</div>
+                                            <span class="font-medium text-white">Google</span>
                                         </div>
                                     </td>
-                                    <td class="py-3 px-4 text-gray-300">user@gmail.com</td>
-                                    <td class="py-3 px-4">
+                                    <td class="py-2 px-4 border-b border-gray-700 text-sm">user@gmail.com</td>
+                                    <td class="py-2 px-4 border-b border-gray-700">
                                         <div class="flex items-center">
                                             <span class="text-gray-300">••••••••</span>
                                             <button type="button" class="ml-2 text-gray-400 hover:text-white">
@@ -311,8 +312,13 @@ if (isset($_GET['logout'])) {
                                             </button>
                                         </div>
                                     </td>
-                                    <td class="py-3 px-4 text-gray-400">May 29, 2024</td>
-                                    <td class="py-3 px-4">
+                                    <td class="py-2 px-4 border-b border-gray-700">
+                                        <div class="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
+                                            <div class="h-full bg-red-500" style="width: 40%"></div>
+                                        </div>
+                                    </td>
+                                    <td class="py-2 px-4 border-b border-gray-700 text-sm text-gray-400">May 29, 2024</td>
+                                    <td class="py-2 px-4 border-b border-gray-700">
                                         <div class="flex space-x-2">
                                              <button type="button" class="text-gray-400 hover:text-white" title="Copy password">
                                                 <i class="ri-clipboard-line"></i>
@@ -328,15 +334,15 @@ if (isset($_GET['logout'])) {
                                 </tr>
                                 <!-- Add more sample entries here -->
                                 <tr class="border-b border-gray-700 hover:bg-gray-700">
-                                    <td class="py-3 px-4">
+                                    <td class="py-2 px-4 border-b border-gray-700">
                                         <div class="flex items-center">
-                                            <?php $website_name = "Facebook"; // Replace with actual data retrieval ?>
-                                            <div class="w-8 h-8 flex items-center justify-center rounded-full bg-blue-500 mr-3 text-white text-xs"><?php echo htmlspecialchars(strtoupper(substr($website_name, 0, 1))); ?></div>
-                                            <span class="font-medium text-white"><?php echo htmlspecialchars($website_name); ?></span>
+                                            <!-- <?php $website_name = "Facebook"; ?> -->
+                                            <div class="w-8 h-8 flex items-center justify-center rounded-full bg-blue-500 mr-3 text-white text-xs">F</div>
+                                            <span class="font-medium text-white">Facebook</span>
                                         </div>
                                     </td>
-                                    <td class="py-3 px-4 text-gray-300">alex.morgan</td>
-                                    <td class="py-3 px-4">
+                                    <td class="py-2 px-4 border-b border-gray-700 text-sm">alex.morgan</td>
+                                    <td class="py-2 px-4 border-b border-gray-700">
                                         <div class="flex items-center">
                                             <span class="text-gray-300">••••••••••</span>
                                             <button type="button" class="ml-2 text-gray-400 hover:text-white">
@@ -346,8 +352,13 @@ if (isset($_GET['logout'])) {
                                             </button>
                                         </div>
                                     </td>
-                                    <td class="py-3 px-4 text-gray-400">May 28, 2024</td>
-                                    <td class="py-3 px-4">
+                                    <td class="py-2 px-4 border-b border-gray-700">
+                                        <div class="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
+                                            <div class="h-full bg-orange-500" style="width: 60%"></div>
+                                        </div>
+                                    </td>
+                                    <td class="py-2 px-4 border-b border-gray-700 text-sm text-gray-400">May 28, 2024</td>
+                                    <td class="py-2 px-4 border-b border-gray-700">
                                         <div class="flex space-x-2">
                                              <button type="button" class="text-gray-400 hover:text-white" title="Copy password">
                                                 <i class="ri-clipboard-line"></i>
@@ -362,15 +373,15 @@ if (isset($_GET['logout'])) {
                                     </td>
                                 </tr>
                                 <tr class="border-b border-gray-700 hover:bg-gray-700">
-                                    <td class="py-3 px-4">
+                                    <td class="py-2 px-4 border-b border-gray-700">
                                         <div class="flex items-center">
-                                            <?php $website_name = "Netflix"; // Replace with actual data retrieval ?>
-                                            <div class="w-8 h-8 flex items-center justify-center rounded-full bg-red-600 mr-3 text-white text-xs"><?php echo htmlspecialchars(strtoupper(substr($website_name, 0, 1))); ?></div>
-                                            <span class="font-medium text-white"><?php echo htmlspecialchars($website_name); ?></span>
+                                            <!-- <?php $website_name = "Netflix"; ?> -->
+                                            <div class="w-8 h-8 flex items-center justify-center rounded-full bg-red-600 mr-3 text-white text-xs">N</div>
+                                            <span class="font-medium text-white">Netflix</span>
                                         </div>
                                     </td>
-                                    <td class="py-3 px-4 text-gray-300">user@email.com</td>
-                                    <td class="py-3 px-4">
+                                    <td class="py-2 px-4 border-b border-gray-700 text-sm">user@email.com</td>
+                                    <td class="py-2 px-4 border-b border-gray-700">
                                         <div class="flex items-center">
                                             <span class="text-gray-300">••••••••••••</span>
                                             <button type="button" class="ml-2 text-gray-400 hover:text-white">
@@ -380,8 +391,13 @@ if (isset($_GET['logout'])) {
                                             </button>
                                         </div>
                                     </td>
-                                    <td class="py-3 px-4 text-gray-400">May 25, 2024</td>
-                                    <td class="py-3 px-4">
+                                    <td class="py-2 px-4 border-b border-gray-700">
+                                        <div class="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
+                                            <div class="h-full bg-green-500" style="width: 80%"></div>
+                                        </div>
+                                    </td>
+                                    <td class="py-2 px-4 border-b border-gray-700 text-sm text-gray-400">May 25, 2024</td>
+                                    <td class="py-2 px-4 border-b border-gray-700">
                                         <div class="flex space-x-2">
                                              <button type="button" class="text-gray-400 hover:text-white" title="Copy password">
                                                 <i class="ri-clipboard-line"></i>
@@ -416,6 +432,64 @@ if (isset($_GET['logout'])) {
                     <button type="button" class="btn btn-outline flex-1 !rounded-button" onclick="closeLogoutModal()">Cancel</button>
                     <button type="button" class="btn btn-primary flex-1 !rounded-button" onclick="logout()">Logout</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Add Password Modal -->
+        <div id="add-password-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 hidden" onclick="handleModalClick(event)">
+            <div class="bg-[#242424] rounded-lg p-8 shadow-lg max-w-md w-full" onclick="event.stopPropagation()">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-lg font-medium text-white">Add New Password</h3>
+                    <button type="button" class="text-gray-400 hover:text-white" onclick="closeAddPasswordModal()">
+                        <i class="ri-close-line text-xl"></i>
+                    </button>
+                </div>
+                <form id="add-password-form" class="space-y-4">
+                    <!-- Website Field -->
+                    <div>
+                        <label for="website" class="block text-sm font-medium text-gray-300 mb-1">Website/App</label>
+                        <input type="text" id="website" name="website" class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-secondary" placeholder="e.g., Google, Facebook">
+                    </div>
+
+                    <!-- Username/Email Field -->
+                    <div>
+                        <label for="username" class="block text-sm font-medium text-gray-300 mb-1">Username/Email</label>
+                        <input type="text" id="username" name="username" class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-secondary" placeholder="Enter username or email">
+                    </div>
+
+                    <!-- Password Field -->
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
+                        <div class="relative">
+                            <input type="password" id="password" name="password" class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-secondary pr-10" placeholder="Enter password">
+                            <button type="button" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white" onclick="togglePasswordVisibility()">
+                                <i class="ri-eye-line"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Password Strength Indicator -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Password Strength</label>
+                        <div class="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                            <div id="password-strength-bar" class="h-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                        <p id="password-strength-text" class="mt-1 text-sm text-gray-400">Enter a password to check strength</p>
+                    </div>
+
+                    <!-- Generate Password Button -->
+                    <div>
+                        <button type="button" class="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white flex items-center justify-center" onclick="generatePassword()">
+                            <i class="ri-refresh-line mr-2"></i> Generate Strong Password
+                        </button>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="flex space-x-2 pt-4">
+                        <button type="button" class="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white" onclick="closeAddPasswordModal()">Cancel</button>
+                        <button type="submit" class="flex-1 px-4 py-2 bg-secondary hover:bg-teal-600 rounded-lg text-white">Save Password</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -489,15 +563,139 @@ if (isset($_GET['logout'])) {
             window.location.href = 'login.php?logout=1';
         }
 
-        // Add Password Modal functions (to be implemented)
+        // Add Password Modal functions
         function showAddPasswordModal() {
-            // TODO: Implement add password modal
-            alert('Add Password functionality coming soon!');
+            document.getElementById('add-password-modal').classList.remove('hidden');
         }
 
-         // Reset timeout on modal interactions
-        document.getElementById('logout-modal').addEventListener('mousemove', resetActivityTimeout);
-        document.getElementById('logout-modal').addEventListener('keypress', resetActivityTimeout);
+        function closeAddPasswordModal() {
+            document.getElementById('add-password-modal').classList.add('hidden');
+            document.getElementById('add-password-form').reset();
+            document.getElementById('password-strength-bar').style.width = '0%';
+            document.getElementById('password-strength-text').textContent = 'Enter a password to check strength';
+            document.getElementById('password-strength-bar').className = 'h-full transition-all duration-300';
+        }
+
+        function handleModalClick(event) {
+            // Close modal if clicking the backdrop (outside the form container)
+            if (event.target.id === 'add-password-modal') {
+                closeAddPasswordModal();
+            }
+        }
+
+        function togglePasswordVisibility() {
+            const passwordInput = document.getElementById('password');
+            const icon = document.querySelector('#password + button i');
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                icon.className = 'ri-eye-off-line';
+            } else {
+                passwordInput.type = 'password';
+                icon.className = 'ri-eye-line';
+            }
+        }
+
+        function checkPasswordStrength(password) {
+            let strength = 0;
+            const feedback = [];
+
+            // Length check
+            if (password.length >= 8) {
+                strength += 25;
+            } else {
+                feedback.push('At least 8 characters');
+            }
+
+            // Lowercase check
+            if (/[a-z]/.test(password)) {
+                strength += 25;
+            } else {
+                feedback.push('Lowercase letter');
+            }
+
+            // Uppercase check
+            if (/[A-Z]/.test(password)) {
+                strength += 25;
+            } else {
+                feedback.push('Uppercase letter');
+            }
+
+            // Number check
+            if (/[0-9]/.test(password)) {
+                strength += 12.5;
+            } else {
+                feedback.push('Number');
+            }
+
+            // Special character check
+            if (/[^A-Za-z0-9]/.test(password)) {
+                strength += 12.5;
+            } else {
+                feedback.push('Special character');
+            }
+
+            // Update strength bar
+            const strengthBar = document.getElementById('password-strength-bar');
+            const strengthText = document.getElementById('password-strength-text');
+
+            strengthBar.style.width = strength + '%';
+            
+            if (strength <= 25) {
+                strengthBar.className = 'h-full bg-red-500 transition-all duration-300';
+                strengthText.textContent = 'Weak - ' + feedback.join(', ');
+            } else if (strength <= 50) {
+                strengthBar.className = 'h-full bg-orange-500 transition-all duration-300';
+                strengthText.textContent = 'Medium - ' + feedback.join(', ');
+            } else if (strength <= 75) {
+                strengthBar.className = 'h-full bg-yellow-500 transition-all duration-300';
+                strengthText.textContent = 'Good - ' + feedback.join(', ');
+            } else {
+                strengthBar.className = 'h-full bg-green-500 transition-all duration-300';
+                strengthText.textContent = 'Strong password!';
+            }
+        }
+
+        function generatePassword() {
+            const length = 16;
+            const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+~`|}{[]:;?><,./-=";
+            let password = "";
+            
+            // Ensure at least one of each required character type
+            password += charset.match(/[a-z]/)[0]; // lowercase
+            password += charset.match(/[A-Z]/)[0]; // uppercase
+            password += charset.match(/[0-9]/)[0]; // number
+            password += charset.match(/[^A-Za-z0-9]/)[0]; // special
+
+            // Fill the rest randomly
+            for (let i = 4; i < length; i++) {
+                const randomIndex = Math.floor(Math.random() * charset.length);
+                password += charset[randomIndex];
+            }
+
+            // Shuffle the password
+            password = password.split('').sort(() => Math.random() - 0.5).join('');
+
+            // Set the password and check its strength
+            const passwordInput = document.getElementById('password');
+            passwordInput.value = password;
+            checkPasswordStrength(password);
+        }
+
+        // Add event listener for password strength checking
+        document.getElementById('password').addEventListener('input', function(e) {
+            checkPasswordStrength(e.target.value);
+        });
+
+        // Add event listener for form submission
+        document.getElementById('add-password-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            // TODO: Add password saving logic
+            closeAddPasswordModal();
+        });
+
+        // Reset timeout on modal interactions
+        document.getElementById('add-password-modal').addEventListener('mousemove', resetActivityTimeout);
+        document.getElementById('add-password-modal').addEventListener('keypress', resetActivityTimeout);
     </script>
 </body>
 </html> 
