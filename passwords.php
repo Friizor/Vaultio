@@ -126,67 +126,38 @@ function decrypt($data, $key) {
     return openssl_decrypt($encrypted, 'AES-256-CBC', $key, 0, $iv);
 }
 
-// Handle password submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_password') {
-    try {
-        // Validate input
-        if (empty($_POST['website']) || empty($_POST['username']) || empty($_POST['password']) || empty($_POST['category'])) {
-            throw new Exception('All fields are required');
-        }
-
-        // Sanitize website name
-        $website = trim($_POST['website']);
-
-        // Sanitize category
-        $category = trim($_POST['category']);
-
-        // Get password strength
-        $password = $_POST['password'];
-        $strength = 'weak';
-        $score = 0;
-
-        // Length check
-        if (strlen($password) >= 8) $score += 25;
-        // Lowercase check
-        if (preg_match('/[a-z]/', $password)) $score += 25;
-        // Uppercase check
-        if (preg_match('/[A-Z]/', $password)) $score += 25;
-        // Number check
-        if (preg_match('/[0-9]/', $password)) $score += 12.5;
-        // Special character check
-        if (preg_match('/[^A-Za-z0-9]/', $password)) $score += 12.5;
-
-        if ($score <= 25) $strength = 'weak';
-        else if ($score <= 50) $strength = 'medium';
-        else $strength = 'strong';
-
-        // Encrypt username and password
-        $key = $_SESSION['user_id'] . 'your-secret-salt';
-        $encrypted_username = encrypt($_POST['username'], $key);
-        $encrypted_password = encrypt($password, $key);
-
-        // Insert into database
-        $stmt = $pdo->prepare("INSERT INTO passwords (user_id, website, username, password, password_length, strength, category) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $result = $stmt->execute([
-            $_SESSION['user_id'],
-            $website,
-            $encrypted_username,
-            $encrypted_password,
-            strlen($password),
-            $strength,
-            $category
-        ]);
-
-        if (!$result) {
-            throw new Exception('Failed to save password');
-        }
-
-        header('Location: passwords.php?success=1');
-        exit;
-
-    } catch (Exception $e) {
-        $error = $e->getMessage();
+// Add success/error message display
+if (isset($_GET['success'])) {
+    if (isset($_GET['action']) && $_GET['action'] === 'edit') {
+        $success = "Password edited successfully!";
+        $notification_type = "info";
+    } else {
+        $success = "Password saved successfully!";
+        $notification_type = "success";
     }
+} elseif (isset($_GET['deleted'])) {
+    $success = "Password deleted successfully!";
+    $notification_type = "error";
+}
+
+// Fetch user's passwords
+try {
+    $stmt = $pdo->prepare("SELECT * FROM passwords WHERE user_id = ? ORDER BY last_updated DESC");
+    $stmt->execute([$_SESSION['user_id']]);
+    $passwords = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Decrypt usernames
+    $key = $_SESSION['user_id'] . 'your-secret-salt';
+    foreach ($passwords as &$password) {
+        try {
+            $password['username'] = decrypt($password['username'], $key);
+        } catch (Exception $e) {
+            $password['username'] = "Error decrypting username";
+        }
+    }
+} catch (PDOException $e) {
+    $error = "Error fetching passwords: " . $e->getMessage();
+    $passwords = [];
 }
 
 // Handle password update (edit_password)
@@ -258,7 +229,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         if ($result) {
             error_log("Password ID " . $passwordId . " updated successfully");
-            echo json_encode(['success' => true, 'message' => 'Password updated successfully!']);
+            echo json_encode(['success' => true, 'message' => 'Password modified']);
         } else {
             error_log("Database execute failed for password ID " . $passwordId);
             // Log detailed error if available (PDO errors might not always throw exceptions for execute)
@@ -275,6 +246,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
     exit; // Stop further execution after handling the AJAX request
+}
+
+// Handle password submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_password') {
+    try {
+        // Validate input
+        if (empty($_POST['website']) || empty($_POST['username']) || empty($_POST['password']) || empty($_POST['category'])) {
+            throw new Exception('All fields are required');
+        }
+
+        // Sanitize website name
+        $website = trim($_POST['website']);
+
+        // Sanitize category
+        $category = trim($_POST['category']);
+
+        // Get password strength
+        $password = $_POST['password'];
+        $strength = 'weak';
+        $score = 0;
+
+        // Length check
+        if (strlen($password) >= 8) $score += 25;
+        // Lowercase check
+        if (preg_match('/[a-z]/', $password)) $score += 25;
+        // Uppercase check
+        if (preg_match('/[A-Z]/', $password)) $score += 25;
+        // Number check
+        if (preg_match('/[0-9]/', $password)) $score += 12.5;
+        // Special character check
+        if (preg_match('/[^A-Za-z0-9]/', $password)) $score += 12.5;
+
+        if ($score <= 25) $strength = 'weak';
+        else if ($score <= 50) $strength = 'medium';
+        else $strength = 'strong';
+
+        // Encrypt username and password
+        $key = $_SESSION['user_id'] . 'your-secret-salt';
+        $encrypted_username = encrypt($_POST['username'], $key);
+        $encrypted_password = encrypt($password, $key);
+
+        // Insert into database
+        $stmt = $pdo->prepare("INSERT INTO passwords (user_id, website, username, password, password_length, strength, category) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $result = $stmt->execute([
+            $_SESSION['user_id'],
+            $website,
+            $encrypted_username,
+            $encrypted_password,
+            strlen($password),
+            $strength,
+            $category
+        ]);
+
+        if (!$result) {
+            throw new Exception('Failed to save password');
+        }
+
+        header('Location: passwords.php?success=1');
+        exit;
+
+    } catch (Exception $e) {
+        $error = $e->getMessage();
+    }
 }
 
 // Handle password deletion
@@ -297,34 +331,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     } catch (Exception $e) {
         $error = $e->getMessage();
     }
-}
-
-// Add success/error message display
-if (isset($_GET['success'])) {
-    $success = "Password saved successfully!";
-} elseif (isset($_GET['deleted'])) {
-    $success = "Password deleted successfully!";
-    $notification_type = "error";
-}
-
-// Fetch user's passwords
-try {
-    $stmt = $pdo->prepare("SELECT * FROM passwords WHERE user_id = ? ORDER BY last_updated DESC");
-    $stmt->execute([$_SESSION['user_id']]);
-    $passwords = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Decrypt usernames
-    $key = $_SESSION['user_id'] . 'your-secret-salt';
-    foreach ($passwords as &$password) {
-        try {
-            $password['username'] = decrypt($password['username'], $key);
-        } catch (Exception $e) {
-            $password['username'] = "Error decrypting username";
-        }
-    }
-} catch (PDOException $e) {
-    $error = "Error fetching passwords: " . $e->getMessage();
-    $passwords = [];
 }
 ?>
 <!DOCTYPE html>
@@ -574,9 +580,24 @@ try {
                 <?php endif; ?>
 
                 <?php if (isset($success)): ?>
-                <div id="success-notification" class="fixed bottom-4 left-4 <?php echo isset($notification_type) && $notification_type === 'error' ? 'bg-red-100 border-red-400 text-red-700' : 'bg-green-100 border-green-400 text-green-700'; ?> border px-4 py-3 rounded-lg shadow-lg z-50">
+                <div id="success-notification" class="fixed bottom-4 left-4 <?php 
+                    if (isset($notification_type)) {
+                        switch($notification_type) {
+                            case 'error':
+                                echo 'bg-red-100 border-red-400 text-red-700';
+                                break;
+                            case 'info':
+                                echo 'bg-blue-100 border-blue-400 text-blue-700';
+                                break;
+                            default:
+                                echo 'bg-green-100 border-green-400 text-green-700';
+                        }
+                    } else {
+                        echo 'bg-green-100 border-green-400 text-green-700';
+                    }
+                ?> border px-4 py-3 rounded-lg shadow-lg z-50">
                     <div class="flex items-center">
-                        <i class="ri-<?php echo isset($notification_type) && $notification_type === 'error' ? 'delete-bin-line' : 'checkbox-circle-line'; ?> text-xl mr-2"></i>
+                        <i class="ri-<?php echo isset($notification_type) && $notification_type === 'error' ? 'delete-bin-line' : ($notification_type === 'info' ? 'edit-line' : 'checkbox-circle-line'); ?> text-xl mr-2"></i>
                         <p><?php echo htmlspecialchars($success); ?></p>
                     </div>
                 </div>
@@ -1129,6 +1150,11 @@ try {
             document.getElementById('edit-password-strength-bar').style.width = '0%';
             document.getElementById('edit-password-strength-text').textContent = 'Enter a password to check strength';
             document.getElementById('edit-password-strength-bar').className = 'h-full transition-all duration-300';
+            
+            // Reset all edit icons to their normal state
+            document.querySelectorAll('.edit-password-button i').forEach(icon => {
+                icon.className = 'ri-edit-line';
+            });
         }
 
         function handleModalClick(event) {
@@ -1152,21 +1178,121 @@ try {
             checkPasswordStrength('edit-password', 'edit-password-strength-bar', 'edit-password-strength-text');
         });
 
+        // Add notification function
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            let bgColor, borderColor, textColor, icon;
+            
+            switch(type) {
+                case 'success':
+                    bgColor = 'bg-green-100';
+                    borderColor = 'border-green-400';
+                    textColor = 'text-green-700';
+                    icon = 'ri-checkbox-circle-line';
+                    break;
+                case 'error':
+                    bgColor = 'bg-red-100';
+                    borderColor = 'border-red-400';
+                    textColor = 'text-red-700';
+                    icon = 'ri-delete-bin-line';
+                    break;
+                case 'info':
+                    bgColor = 'bg-blue-100';
+                    borderColor = 'border-blue-400';
+                    textColor = 'text-blue-700';
+                    icon = 'ri-edit-line';
+                    break;
+                default:
+                    bgColor = 'bg-green-100';
+                    borderColor = 'border-green-400';
+                    textColor = 'text-green-700';
+                    icon = 'ri-checkbox-circle-line';
+            }
+            
+            notification.className = `fixed bottom-4 left-4 ${bgColor} ${borderColor} ${textColor} border px-4 py-3 rounded-lg shadow-lg z-50`;
+            notification.innerHTML = `
+                <div class="flex items-center">
+                    <i class="ri-${icon} text-xl mr-2"></i>
+                    <p>${message}</p>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Remove notification after 2 seconds
+            setTimeout(() => {
+                notification.remove();
+            }, 2000);
+        }
+
+        // Add event listeners for edit buttons
+        document.querySelectorAll('.edit-password-button').forEach(button => {
+            button.addEventListener('click', async function() {
+                const passwordId = this.dataset.id;
+                const row = this.closest('tr');
+                
+                if (!row) {
+                    console.error('Could not find table row for edit button.');
+                    return;
+                }
+
+                // Get data from the row
+                const website = row.querySelector('td:first-child span').textContent;
+                const username = row.querySelector('td:nth-child(2)').textContent;
+                const passwordMask = row.querySelector('.password-mask');
+                const encryptedPassword = passwordMask ? passwordMask.dataset.password : '';
+                const category = row.querySelector('td:nth-child(5)').textContent;
+
+                if (!encryptedPassword) {
+                    console.error('Could not find password data.');
+                    showNotification('Error: Could not retrieve password data.', 'error');
+                    return;
+                }
+
+                try {
+                    // Show loading state
+                    const icon = this.querySelector('i');
+                    const originalIcon = icon.className;
+                    icon.className = 'ri-loader-4-line animate-spin';
+                    
+                    // Decrypt password
+                    const response = await fetch('decrypt_password.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ password: encryptedPassword })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Show the edit modal with the decrypted data
+                        showEditPasswordModal(passwordId, website, username, data.password, category);
+                    } else {
+                        throw new Error(data.message || 'Failed to decrypt password');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    showNotification('Error decrypting password: ' + error.message, 'error');
+                } finally {
+                    // Reset icon
+                    const icon = this.querySelector('i');
+                    icon.className = originalIcon;
+                }
+            });
+        });
+
         // Add event listener for form submission on edit modal (Handle via AJAX)
         document.getElementById('edit-password-form').addEventListener('submit', function(e) {
             e.preventDefault(); // Prevent default form submission
 
             const form = e.target;
             const formData = new FormData(form);
-
-            // Debug log formData content
-            console.log('FormData content:');
-            for (let pair of formData.entries()) {
-                console.log(pair[0]+ ': ' + pair[1]);
-            }
-
-            // Log the URL being fetched
-            console.log('Fetching to:', form.action, 'with method:', form.method);
 
             fetch('passwords.php', {
                 method: 'POST',
@@ -1182,27 +1308,20 @@ try {
                 try {
                     const data = JSON.parse(text);
                     if (data.success) {
-                        alert('Password updated successfully!');
                         closeEditPasswordModal();
-                        window.location.reload();
+                        window.location.href = 'passwords.php?success=1&action=edit';
                     } else {
-                        alert('Error: ' + (data.message || 'Failed to update password'));
+                        showNotification(data.message || 'Failed to update password', 'error');
                     }
                 } catch (e) {
                     console.error('Error parsing response:', text);
-                    alert('Error updating password. Please try again.');
+                    showNotification('Error updating password. Please try again.', 'error');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('An error occurred while saving changes. Please try again.');
+                showNotification('An error occurred while saving changes. Please try again.', 'error');
             });
-        });
-
-        // Add event listener for form submission on add modal
-        document.getElementById('add-password-form').addEventListener('submit', function(e) {
-            // Password strength check is already handled by input event
-            // This submit handler can be used for additional validation or AJAX submission if needed later
         });
 
         // Reset timeout on modal interactions
@@ -1332,50 +1451,6 @@ try {
             if (e.target === this) {
                 closeDeleteModal();
             }
-        });
-
-        // Add notification function
-        function showNotification(message, type = 'success') {
-            const notification = document.createElement('div');
-            notification.className = `fixed bottom-4 right-4 px-4 py-2 rounded-lg shadow-lg z-50 ${
-                type === 'success' ? 'bg-green-500' : 'bg-red-500'
-            } text-white`;
-            notification.textContent = message;
-            document.body.appendChild(notification);
-            
-            // Remove notification after 3 seconds
-            setTimeout(() => {
-                notification.remove();
-            }, 3000);
-        }
-
-        // Add event listeners for edit buttons
-        document.querySelectorAll('.edit-password-button').forEach(button => {
-            button.addEventListener('click', function() {
-                const passwordId = this.dataset.id;
-                const row = this.closest('tr');
-                
-                if (!row) {
-                    console.error('Could not find table row for edit button.');
-                    return;
-                }
-
-                // Get data from the row
-                const website = row.querySelector('td:first-child span').textContent;
-                const username = row.querySelector('td:nth-child(2)').textContent;
-                const passwordMask = row.querySelector('.password-mask');
-                const password = passwordMask ? passwordMask.dataset.password : '';
-                const category = row.querySelector('td:nth-child(5)').textContent;
-
-                if (!password) {
-                    console.error('Could not find password data.');
-                    alert('Error: Could not retrieve password data.');
-                    return;
-                }
-
-                // Show the edit modal with the data
-                showEditPasswordModal(passwordId, website, username, password, category);
-            });
         });
     </script>
 </body>
