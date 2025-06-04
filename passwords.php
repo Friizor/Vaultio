@@ -312,24 +312,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 }
 
 // Handle password deletion
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_password') {
-    try {
-        if (empty($_POST['password_id'])) {
-            throw new Exception('Password ID is required');
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    if ($_POST['action'] === 'delete_password') {
+        try {
+            if (empty($_POST['password_id'])) {
+                throw new Exception('Password ID is required');
+            }
+
+            $stmt = $pdo->prepare("DELETE FROM passwords WHERE id = ? AND user_id = ?");
+            $result = $stmt->execute([$_POST['password_id'], $_SESSION['user_id']]);
+
+            if (!$result) {
+                throw new Exception('Failed to delete password');
+            }
+
+            header('Location: passwords.php?deleted=1');
+            exit;
+
+        } catch (Exception $e) {
+            $error = $e->getMessage();
         }
+    } elseif ($_POST['action'] === 'delete_all_passwords') {
+        try {
+            $stmt = $pdo->prepare("DELETE FROM passwords WHERE user_id = ?");
+            $result = $stmt->execute([$_SESSION['user_id']]);
 
-        $stmt = $pdo->prepare("DELETE FROM passwords WHERE id = ? AND user_id = ?");
-        $result = $stmt->execute([$_POST['password_id'], $_SESSION['user_id']]);
+            if (!$result) {
+                throw new Exception('Failed to delete all passwords');
+            }
 
-        if (!$result) {
-            throw new Exception('Failed to delete password');
+            header('Location: passwords.php?deleted=1');
+            exit;
+
+        } catch (Exception $e) {
+            $error = $e->getMessage();
         }
-
-        header('Location: passwords.php?deleted=1');
-        exit;
-
-    } catch (Exception $e) {
-        $error = $e->getMessage();
     }
 }
 ?>
@@ -838,10 +855,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 </div>
 
                 <!-- Add Export PDF Button -->
-                <div class="flex justify-start mb-4">
+                <div class="flex justify-start mb-4 space-x-4">
                     <button id="export-pdf" class="px-4 py-2 bg-secondary hover:bg-teal-600 rounded-lg text-white flex items-center">
                         <i class="ri-file-pdf-line mr-2"></i> Export to PDF
                     </button>
+                    <button id="delete-all" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white flex items-center">
+                        <i class="ri-delete-bin-line mr-2"></i> Delete All
+                    </button>
+                </div>
+
+                <!-- First Delete All Confirmation Modal -->
+                <div id="delete-all-first-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 hidden">
+                    <div class="bg-[#242424] rounded-lg p-8 shadow-lg text-center max-w-xs w-full">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-medium text-white">Delete All Passwords</h3>
+                            <button type="button" class="text-gray-400 hover:text-white" onclick="closeDeleteAllFirstModal()">
+                                <i class="ri-close-line text-xl"></i>
+                            </button>
+                        </div>
+                        <p class="text-gray-400 text-sm mb-4">Are you sure you want to delete all passwords? This action cannot be undone.</p>
+                        <div class="flex space-x-2">
+                            <button type="button" class="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white" onclick="closeDeleteAllFirstModal()">Cancel</button>
+                            <button type="button" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white" onclick="showDeleteAllSecondModal()">Continue</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Second Delete All Confirmation Modal -->
+                <div id="delete-all-second-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 hidden">
+                    <div class="bg-[#242424] rounded-lg p-8 shadow-lg text-center max-w-xs w-full">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-medium text-white">Final Confirmation</h3>
+                            <button type="button" class="text-gray-400 hover:text-white" onclick="closeDeleteAllSecondModal()">
+                                <i class="ri-close-line text-xl"></i>
+                            </button>
+                        </div>
+                        <p class="text-gray-400 text-sm mb-4">This is your last chance to cancel. All passwords will be permanently deleted.</p>
+                        <div class="flex space-x-2">
+                            <button type="button" class="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white" onclick="closeDeleteAllSecondModal()">Cancel</button>
+                            <button type="button" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white" onclick="confirmDeleteAll()">Delete All</button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Delete Confirmation Modal -->
@@ -1022,7 +1076,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         <button type="button" class="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white" onclick="closeAddPasswordModal()">Cancel</button>
                         <button type="submit" class="flex-1 px-4 py-2 bg-secondary hover:bg-teal-600 rounded-lg text-white">Save Password</button>
                     </div>
-                </form>
+                </form>Parse error: Unclosed '{' on line 315 in C:\xampp\htdocs\Vaultio\passwords.php on line 2007
             </div>
         </div>
     </div>
@@ -1896,6 +1950,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         // Reset timeout on PDF export button
         document.getElementById('export-pdf').addEventListener('click', resetActivityTimeout);
+
+        // Add Delete All functionality
+        document.getElementById('delete-all').addEventListener('click', function() {
+            showDeleteAllFirstModal();
+        });
+
+        function showDeleteAllFirstModal() {
+            document.getElementById('delete-all-first-modal').classList.remove('hidden');
+        }
+
+        function closeDeleteAllFirstModal() {
+            document.getElementById('delete-all-first-modal').classList.add('hidden');
+        }
+
+        function showDeleteAllSecondModal() {
+            closeDeleteAllFirstModal();
+            document.getElementById('delete-all-second-modal').classList.remove('hidden');
+        }
+
+        function closeDeleteAllSecondModal() {
+            document.getElementById('delete-all-second-modal').classList.add('hidden');
+        }
+
+        function confirmDeleteAll() {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.innerHTML = `
+                <input type="hidden" name="action" value="delete_all_passwords">
+            `;
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        // Close delete all modals when clicking outside
+        document.getElementById('delete-all-first-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeDeleteAllFirstModal();
+            }
+        });
+
+        document.getElementById('delete-all-second-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeDeleteAllSecondModal();
+            }
+        });
+
+        // Reset timeout on delete all button
+        document.getElementById('delete-all').addEventListener('click', resetActivityTimeout);
     </script>
 </body>
 </html> 
