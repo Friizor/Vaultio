@@ -58,6 +58,80 @@ if (isset($_GET['logout'])) {
     header('Location: login.php');
     exit;
 }
+
+// Handle note creation
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_note') {
+    try {
+        // Validate input
+        if (empty($_POST['title']) || empty($_POST['content'])) {
+            throw new Exception('Title and content are required');
+        }
+
+        $title = trim($_POST['title']);
+        $content = trim($_POST['content']);
+        $tags = isset($_POST['tags']) ? trim($_POST['tags']) : '';
+
+        // Insert into database
+        $stmt = $pdo->prepare("INSERT INTO notes (user_id, title, content, author) VALUES (?, ?, ?, ?)");
+        $result = $stmt->execute([
+            $_SESSION['user_id'],
+            $title,
+            $content,
+            $_SESSION['user']
+        ]);
+
+        if (!$result) {
+            throw new Exception('Failed to save note');
+        }
+
+        header('Location: notes.php?success=1');
+        exit;
+
+    } catch (Exception $e) {
+        $error = $e->getMessage();
+    }
+}
+
+// Handle note deletion
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_note') {
+    try {
+        if (empty($_POST['note_id'])) {
+            throw new Exception('Note ID is required');
+        }
+
+        $stmt = $pdo->prepare("DELETE FROM notes WHERE id = ? AND user_id = ?");
+        $result = $stmt->execute([$_POST['note_id'], $_SESSION['user_id']]);
+
+        if (!$result) {
+            throw new Exception('Failed to delete note');
+        }
+
+        header('Location: notes.php?deleted=1');
+        exit;
+
+    } catch (Exception $e) {
+        $error = $e->getMessage();
+    }
+}
+
+// Add success/error message display
+if (isset($_GET['success'])) {
+    $success = "Note saved successfully!";
+    $notification_type = "success";
+} elseif (isset($_GET['deleted'])) {
+    $success = "Note deleted successfully!";
+    $notification_type = "error";
+}
+
+// Fetch user's notes
+try {
+    $stmt = $pdo->prepare("SELECT * FROM notes WHERE user_id = ? ORDER BY last_updated DESC");
+    $stmt->execute([$_SESSION['user_id']]);
+    $notes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $error = "Error fetching notes: " . $e->getMessage();
+    $notes = [];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -283,6 +357,34 @@ if (isset($_GET['logout'])) {
          .filter-tag:hover, .sort-option:hover {
              background-color: #333;
          }
+        .note-editor {
+            background-color: #333;
+            border-radius: 8px;
+            border: 1px solid #444;
+            min-height: 200px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            color: #E5E5E5;
+            font-family: 'Inter', sans-serif;
+            resize: vertical;
+        }
+        .note-editor:focus {
+            outline: none;
+            border-color: #0D9488;
+            box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.2);
+        }
+        .tag-input {
+            background-color: #333;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 0.5rem;
+            color: #E5E5E5;
+            font-size: 0.875rem;
+        }
+        .tag-input:focus {
+            outline: none;
+            border-color: #0D9488;
+        }
     </style>
 </head>
 <body>
@@ -330,6 +432,45 @@ if (isset($_GET['logout'])) {
             <!-- Main Content -->
             <div class="main-content">
                 <h1 class="text-2xl font-semibold text-white mb-6">Notes</h1>
+
+                <?php if (isset($error)): ?>
+                <div class="mb-4 p-4 bg-red-500 bg-opacity-20 border border-red-500 rounded-lg text-red-500">
+                    <?php echo htmlspecialchars($error); ?>
+                </div>
+                <?php endif; ?>
+
+                <?php if (isset($success)): ?>
+                <div id="success-notification" class="fixed bottom-4 left-4 <?php 
+                    if (isset($notification_type)) {
+                        switch($notification_type) {
+                            case 'error':
+                                echo 'bg-red-100 border-red-400 text-red-700';
+                                break;
+                            case 'info':
+                                echo 'bg-blue-100 border-blue-400 text-blue-700';
+                                break;
+                            default:
+                                echo 'bg-green-100 border-green-400 text-green-700';
+                        }
+                    } else {
+                        echo 'bg-green-100 border-green-400 text-green-700';
+                    }
+                ?> border px-4 py-3 rounded-lg shadow-lg z-50">
+                    <div class="flex items-center">
+                        <i class="ri-<?php echo isset($notification_type) && $notification_type === 'error' ? 'delete-bin-line' : ($notification_type === 'info' ? 'edit-line' : 'checkbox-circle-line'); ?> text-xl mr-2"></i>
+                        <p><?php echo htmlspecialchars($success); ?></p>
+                    </div>
+                </div>
+                <script>
+                    // Auto close notification after 2 seconds
+                    setTimeout(() => {
+                        const notification = document.getElementById('success-notification');
+                        if (notification) {
+                            notification.remove();
+                        }
+                    }, 2000);
+                </script>
+                <?php endif; ?>
 
                 <!-- Search and Filter -->
                 <div class="mb-6">
@@ -387,25 +528,34 @@ if (isset($_GET['logout'])) {
 
                 <!-- Notes Grid -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <!-- Sample Note Card -->
-                    <div class="note-card">
-                        <div class="flex justify-between items-start mb-2">
-                            <h3 class="text-lg font-medium text-white">Meeting Notes</h3>
-                            <div class="flex space-x-2">
-                                <button class="text-gray-400 hover:text-white" title="Edit">
-                                    <i class="ri-edit-line"></i>
-                                </button>
-                                <button class="text-gray-400 hover:text-white" title="Delete">
-                                    <i class="ri-delete-bin-line"></i>
-                                </button>
+                    <?php if (empty($notes)): ?>
+                        <div class="col-span-full text-center text-gray-400 py-8">
+                            <i class="ri-sticky-note-line text-4xl mb-4 block"></i>
+                            <p class="text-lg mb-2">No notes yet</p>
+                            <p class="text-sm">Create your first note to get started</p>
+                        </div>
+                    <?php else: ?>
+                        <?php foreach ($notes as $note): ?>
+                            <div class="note-card">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h3 class="text-lg font-medium text-white"><?php echo htmlspecialchars($note['title']); ?></h3>
+                                    <div class="flex space-x-2">
+                                        <button class="text-gray-400 hover:text-white" title="Edit" onclick="editNote(<?php echo $note['id']; ?>)">
+                                            <i class="ri-edit-line"></i>
+                                        </button>
+                                        <button class="text-gray-400 hover:text-white" title="Delete" onclick="deleteNote(<?php echo $note['id']; ?>)">
+                                            <i class="ri-delete-bin-line"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <p class="text-gray-400 text-sm mb-2"><?php echo htmlspecialchars(substr($note['content'], 0, 100)) . (strlen($note['content']) > 100 ? '...' : ''); ?></p>
+                                <div class="flex justify-between items-center text-xs text-gray-500">
+                                    <span><?php echo date('M d, Y', strtotime($note['last_updated'])); ?></span>
+                                    <span>by <?php echo htmlspecialchars($note['author']); ?></span>
+                                </div>
                             </div>
-                        </div>
-                        <p class="text-gray-400 text-sm mb-2">Project planning and team updates...</p>
-                        <div class="flex justify-between items-center text-xs text-gray-500">
-                            <span>May 29, 2024</span>
-                            <span>2 tags</span>
-                        </div>
-                    </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -414,6 +564,74 @@ if (isset($_GET['logout'])) {
         <button class="fab" onclick="showAddNoteModal()">
             <i class="ri-add-line text-2xl"></i>
         </button>
+
+        <!-- Add Note Modal -->
+        <div id="add-note-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 hidden" onclick="handleModalClick(event)">
+            <div class="bg-[#242424] rounded-lg p-8 shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-lg font-medium text-white">Add New Note</h3>
+                    <button type="button" class="text-gray-400 hover:text-white" onclick="closeAddNoteModal()">
+                        <i class="ri-close-line text-xl"></i>
+                    </button>
+                </div>
+                <?php if (isset($error)): ?>
+                    <div class="bg-red-500 bg-opacity-20 border border-red-500 text-red-500 px-4 py-3 rounded relative mb-4" role="alert">
+                        <span class="block sm:inline"><?php echo htmlspecialchars($error); ?></span>
+                    </div>
+                <?php endif; ?>
+                <form id="add-note-form" method="POST" action="notes.php" class="space-y-4">
+                    <input type="hidden" name="action" value="add_note">
+                    
+                    <!-- Title Field -->
+                    <div>
+                        <label for="note-title" class="block text-sm font-medium text-gray-300 mb-1">Title</label>
+                        <input type="text" id="note-title" name="title" required class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-secondary" placeholder="Enter note title">
+                    </div>
+
+                    <!-- Content Field -->
+                    <div>
+                        <label for="note-content" class="block text-sm font-medium text-gray-300 mb-1">Content</label>
+                        <textarea id="note-content" name="content" required class="note-editor w-full" placeholder="Write your note content here..."></textarea>
+                    </div>
+
+                    <!-- Tags Field (Optional) -->
+                    <div>
+                        <label for="note-tags" class="block text-sm font-medium text-gray-300 mb-1">
+                            Tags
+                            <span class="text-gray-500 text-xs">(Optional - separate with commas)</span>
+                        </label>
+                        <input type="text" id="note-tags" name="tags" class="tag-input w-full" placeholder="work, ideas, personal">
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="flex space-x-2 pt-4">
+                        <button type="button" class="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white" onclick="closeAddNoteModal()">Cancel</button>
+                        <button type="submit" class="flex-1 px-4 py-2 bg-secondary hover:bg-teal-600 rounded-lg text-white">Save Note</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Delete Confirmation Modal -->
+        <div id="delete-note-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 hidden">
+            <div class="bg-[#242424] rounded-lg p-8 shadow-lg text-center max-w-xs w-full">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-medium text-white">Delete Note</h3>
+                    <button type="button" class="text-gray-400 hover:text-white" onclick="closeDeleteNoteModal()">
+                        <i class="ri-close-line text-xl"></i>
+                    </button>
+                </div>
+                <p class="text-gray-400 text-sm mb-4">Are you sure you want to delete this note? This action cannot be undone.</p>
+                <form id="delete-note-form" method="POST" action="notes.php" class="space-y-4">
+                    <input type="hidden" name="action" value="delete_note">
+                    <input type="hidden" name="note_id" id="delete-note-id">
+                    <div class="flex space-x-2">
+                        <button type="button" class="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white" onclick="closeDeleteNoteModal()">Cancel</button>
+                        <button type="submit" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white">Delete</button>
+                    </div>
+                </form>
+            </div>
+        </div>
 
         <!-- Logout Modal -->
         <div id="logout-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 hidden">
@@ -497,15 +715,70 @@ if (isset($_GET['logout'])) {
             window.location.href = 'login.php?logout=1';
         }
 
-        // Add Note Modal functions (to be implemented)
+        // Add Note Modal functions
         function showAddNoteModal() {
-            // TODO: Implement add note modal
-            alert('Add Note functionality coming soon!');
+            document.getElementById('add-note-modal').classList.remove('hidden');
+            // Focus on title input
+            setTimeout(() => {
+                document.getElementById('note-title').focus();
+            }, 100);
+        }
+
+        function closeAddNoteModal() {
+            document.getElementById('add-note-modal').classList.add('hidden');
+            document.getElementById('add-note-form').reset();
+        }
+
+        function handleModalClick(event) {
+            // Close add modal if clicking the backdrop (outside the form container)
+            if (event.target.id === 'add-note-modal') {
+                closeAddNoteModal();
+            }
+        }
+
+        // Delete Note Modal functions
+        function deleteNote(noteId) {
+            document.getElementById('delete-note-id').value = noteId;
+            document.getElementById('delete-note-modal').classList.remove('hidden');
+        }
+
+        function closeDeleteNoteModal() {
+            document.getElementById('delete-note-modal').classList.add('hidden');
+        }
+
+        // Edit Note function (placeholder for future implementation)
+        function editNote(noteId) {
+            // TODO: Implement edit note functionality
+            alert('Edit note functionality coming soon!');
         }
 
         // Reset timeout on modal interactions
         document.getElementById('logout-modal').addEventListener('mousemove', resetActivityTimeout);
         document.getElementById('logout-modal').addEventListener('keypress', resetActivityTimeout);
+        document.getElementById('add-note-modal').addEventListener('mousemove', resetActivityTimeout);
+        document.getElementById('add-note-modal').addEventListener('keypress', resetActivityTimeout);
+        document.getElementById('delete-note-modal').addEventListener('mousemove', resetActivityTimeout);
+        document.getElementById('delete-note-modal').addEventListener('keypress', resetActivityTimeout);
+
+        // Add search functionality
+        document.getElementById('search-input').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const noteCards = document.querySelectorAll('.note-card');
+            
+            noteCards.forEach(card => {
+                const title = card.querySelector('h3').textContent.toLowerCase();
+                const content = card.querySelector('p').textContent.toLowerCase();
+                
+                if (title.includes(searchTerm) || content.includes(searchTerm)) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+
+        // Reset timeout on search input
+        document.getElementById('search-input').addEventListener('input', resetActivityTimeout);
     </script>
 </body>
 </html> 
