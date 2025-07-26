@@ -59,6 +59,22 @@ CREATE TABLE `notes` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `todos`
+--
+
+CREATE TABLE `todos` (
+  `id` int(11) NOT NULL,
+  `note_id` int(11) NOT NULL,
+  `text` varchar(500) NOT NULL,
+  `completed` tinyint(1) DEFAULT 0,
+  `position` int(11) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `passwords`
 --
 
@@ -149,6 +165,13 @@ ALTER TABLE `notes`
   ADD KEY `idx_user_id` (`user_id`);
 
 --
+-- Indexes for table `todos`
+--
+ALTER TABLE `todos`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `note_id` (`note_id`);
+
+--
 -- Indexes for table `passwords`
 --
 ALTER TABLE `passwords`
@@ -186,6 +209,12 @@ ALTER TABLE `notes`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `todos`
+--
+ALTER TABLE `todos`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `passwords`
 --
 ALTER TABLE `passwords`
@@ -212,6 +241,12 @@ ALTER TABLE `cards`
 --
 ALTER TABLE `notes`
   ADD CONSTRAINT `notes_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `todos`
+--
+ALTER TABLE `todos`
+  ADD CONSTRAINT `todos_ibfk_1` FOREIGN KEY (`note_id`) REFERENCES `notes` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `passwords`
